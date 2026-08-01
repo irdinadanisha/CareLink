@@ -5,6 +5,7 @@ type ConversationMessage = {
 
 type PatientContext = {
   conversation?: ConversationMessage[];
+  language?: "en" | "ms";
 };
 
 type ChatApiResponse = {
@@ -29,7 +30,7 @@ export async function sendMessageToLlama(
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, language: patientContext.language ?? "en" }),
   });
 
   const data = (await response.json()) as ChatApiResponse;

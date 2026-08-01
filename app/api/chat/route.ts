@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as { messages?: unknown };
+    const body = (await request.json()) as { messages?: unknown; language?: unknown };
     if (!Array.isArray(body.messages)) {
       return NextResponse.json(
         { error: "A conversation is required." },
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
     }
 
     const groq = new Groq({ apiKey });
+    const responseLanguage = body.language === "ms" ? "Bahasa Melayu (Malaysia)" : "English";
     const completion = await groq.chat.completions.create({
       model: MODEL,
       messages: [
@@ -97,6 +98,10 @@ export async function POST(request: Request) {
         {
           role: "system",
           content: `CARELINK RECORD SNAPSHOT:\n${JSON.stringify(assistantPatientContext)}`,
+        },
+        {
+          role: "system",
+          content: `Reply in ${responseLanguage}. When replying in Bahasa Melayu, use natural Malaysian medical terminology and briefly explain specialist terms. Do not use Indonesian vocabulary.`,
         },
         ...messages,
       ],

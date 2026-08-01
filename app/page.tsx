@@ -1,14 +1,60 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Bell, Bot, CalendarDays, ChevronDown, ClipboardList, Droplets, Eye, EyeOff, HeartPulse, Home, Info, LogOut, Menu, MessageCircle, Moon, Pill, Send, Settings, ShieldCheck, Sparkles, Stethoscope, TestTube2, Trash2, User, X } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { appointments, bloodTests, clinicalSummary, healthMetrics, nephropathyModelInput, neuropathyModelInput, patient, trendData } from "@/src/data/mockData";
+import {
+  Activity,
+  Bell,
+  Bot,
+  CalendarDays,
+  ChevronDown,
+  ClipboardList,
+  Droplets,
+  Eye,
+  EyeOff,
+  HeartPulse,
+  Home,
+  Info,
+  Languages,
+  LogOut,
+  Menu,
+  MessageCircle,
+  Moon,
+  Pill,
+  Send,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Stethoscope,
+  TestTube2,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  appointments,
+  bloodTests,
+  clinicalSummary,
+  healthMetrics,
+  nephropathyModelInput,
+  neuropathyModelInput,
+  patient,
+  trendData,
+} from "@/src/data/mockData";
 import { predictNephropathyRisk } from "@/src/services/randomForestNephropathyService";
 import { predictNeuropathyRisk } from "@/src/services/randomForestNeuropathyService";
 import { sendMessageToLlama } from "@/src/services/llamaService";
 import type { ChatMessage, Page } from "@/src/types";
 import { KidneysIcon } from "@/src/components/KidneysIcon";
+import { applyLanguage, type Language } from "@/src/i18n/malay";
 
 const nav = [
   { id: "dashboard", label: "Home", icon: Home },
@@ -20,66 +66,1202 @@ const nav = [
 ] as const;
 
 function Brand({ compact = false }: { compact?: boolean }) {
-  return <div className="brand"><span className="brand-mark"><HeartPulse size={22}/></span>{!compact && <div><strong>CareLink</strong><small>AI health companion</small></div>}</div>;
+  return (
+    <div className="brand">
+      <span className="brand-mark">
+        <HeartPulse size={22} />
+      </span>
+      {!compact && (
+        <div>
+          <strong>CareLink</strong>
+          <small>AI health companion</small>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const tone = /good|stable|low|normal/i.test(status) ? "good" : /high|attention|above/i.test(status) ? "warn" : "info";
-  return <span className={`badge ${tone}`}><span aria-hidden="true">●</span>{status}</span>;
+  const tone = /good|stable|low|normal/i.test(status)
+    ? "good"
+    : /high|attention|above/i.test(status)
+      ? "warn"
+      : "info";
+  return (
+    <span className={`badge ${tone}`}>
+      <span aria-hidden="true">●</span>
+      {status}
+    </span>
+  );
 }
 
-function Notice({ children, kind = "info" }: { children: React.ReactNode; kind?: "info" | "warning" }) {
-  return <div className={`notice ${kind}`}><Info size={18}/><p>{children}</p></div>;
+function Notice({
+  children,
+  kind = "info",
+}: {
+  children: React.ReactNode;
+  kind?: "info" | "warning";
+}) {
+  return (
+    <div className={`notice ${kind}`}>
+      <Info size={18} />
+      <p>{children}</p>
+    </div>
+  );
 }
 
-function Header({ title, onMenu }: { title: string; onMenu: () => void }) {
-  return <header className="topbar"><button className="icon-button mobile-menu" onClick={onMenu} aria-label="Open menu"><Menu/></button><div><p className="eyebrow">PATIENT PORTAL</p><h1>{title}</h1></div><div className="top-actions"><button className="icon-button" aria-label="Notifications"><Bell size={21}/><i/></button><div className="avatar">SA</div></div></header>;
+function Header({
+  title,
+  onMenu,
+  language,
+  onLanguageChange,
+}: {
+  title: string;
+  onMenu: () => void;
+  language: Language;
+  onLanguageChange: () => void;
+}) {
+  return (
+    <header className="topbar">
+      <button
+        className="icon-button mobile-menu"
+        onClick={onMenu}
+        aria-label="Open menu"
+      >
+        <Menu />
+      </button>
+      <div>
+        <p className="eyebrow">PATIENT PORTAL</p>
+        <h1>{title}</h1>
+      </div>
+      <div className="top-actions">
+        <button
+          className="language-button"
+          onClick={onLanguageChange}
+          aria-label={
+            language === "en" ? "Tukar ke Bahasa Melayu" : "Switch to English"
+          }
+        >
+          <Languages size={18} />
+          <span>{language === "en" ? "BM" : "EN"}</span>
+        </button>
+        <button className="icon-button" aria-label="Notifications">
+          <Bell size={21} />
+          <i />
+        </button>
+        <div className="avatar">SA</div>
+      </div>
+    </header>
+  );
 }
 
 function Login({ onLogin }: { onLogin: () => void }) {
   const [show, setShow] = useState(false);
-  return <main className="login-page"><section className="login-side"><Brand/><div className="login-copy"><span className="hero-icon"><HeartPulse/></span><p className="eyebrow light">YOUR HEALTH, MADE CLEARER</p><h1>Feel informed at every step of your care.</h1><p>A calm, secure place to understand your results, prepare for appointments, and ask better questions.</p><div className="trust-list"><span><ShieldCheck/>Private & secure</span><span><Stethoscope/>Built around your care</span></div></div><p className="side-note">For educational support only. Always follow advice from your care team.</p></section><section className="login-panel"><div className="mobile-brand"><Brand/></div><form className="login-card" onSubmit={e => {e.preventDefault(); onLogin();}}><div><p className="eyebrow">WELCOME BACK</p><h2>Sign in to your account</h2><p>Understand your health. Ask questions. Stay informed.</p></div><label>Email or patient ID<input defaultValue="sarah.ahmad@example.com" type="text" autoComplete="username"/></label><label>Password<div className="password"><input defaultValue="password" type={show ? "text" : "password"} autoComplete="current-password"/><button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"}>{show ? <EyeOff/> : <Eye/>}</button></div></label><div className="form-row"><label className="check"><input type="checkbox" defaultChecked/> Remember me</label><button className="link" type="button">Forgot password?</button></div><button className="primary wide" type="submit">Sign in securely</button><p className="support">Need help? <button type="button" className="link">Contact your clinic</button></p></form></section></main>;
+  return (
+    <main className="login-page">
+      <section className="login-side">
+        <Brand />
+        <div className="login-copy">
+          <span className="hero-icon">
+            <HeartPulse />
+          </span>
+          <p className="eyebrow light">YOUR HEALTH, MADE CLEARER</p>
+          <h1>Feel informed at every step of your care.</h1>
+          <p>
+            A calm, secure place to understand your results, prepare for
+            appointments, and ask better questions.
+          </p>
+          <div className="trust-list">
+            <span>
+              <ShieldCheck />
+              Private & secure
+            </span>
+            <span>
+              <Stethoscope />
+              Built around your care
+            </span>
+          </div>
+        </div>
+        <p className="side-note">
+          For educational support only. Always follow advice from your care
+          team.
+        </p>
+      </section>
+      <section className="login-panel">
+        <div className="mobile-brand">
+          <Brand />
+        </div>
+        <form
+          className="login-card"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onLogin();
+          }}
+        >
+          <div>
+            <p className="eyebrow">WELCOME BACK</p>
+            <h2>Sign in to your account</h2>
+            <p>Understand your health. Ask questions. Stay informed.</p>
+          </div>
+          <label>
+            Email or patient ID
+            <input
+              defaultValue="sarah.ahmad@example.com"
+              type="text"
+              autoComplete="username"
+            />
+          </label>
+          <label>
+            Password
+            <div className="password">
+              <input
+                defaultValue="password"
+                type={show ? "text" : "password"}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShow(!show)}
+                aria-label={show ? "Hide password" : "Show password"}
+              >
+                {show ? <EyeOff /> : <Eye />}
+              </button>
+            </div>
+          </label>
+          <div className="form-row">
+            <label className="check">
+              <input type="checkbox" defaultChecked /> Remember me
+            </label>
+            <button className="link" type="button">
+              Forgot password?
+            </button>
+          </div>
+          <button className="primary wide" type="submit">
+            Sign in securely
+          </button>
+          <p className="support">
+            Need help?{" "}
+            <button type="button" className="link">
+              Contact your clinic
+            </button>
+          </p>
+        </form>
+      </section>
+    </main>
+  );
 }
 
 function Dashboard({ go }: { go: (p: Page) => void }) {
-  const [nephropathyRisk,setNephropathyRisk]=useState<Awaited<ReturnType<typeof predictNephropathyRisk>>|null>(null);const [neuropathyRisk,setNeuropathyRisk]=useState<Awaited<ReturnType<typeof predictNeuropathyRisk>>|null>(null);useEffect(()=>{let active=true;Promise.all([predictNephropathyRisk(nephropathyModelInput),predictNeuropathyRisk(neuropathyModelInput)]).then(([nephropathy,neuropathy])=>{if(active){setNephropathyRisk(nephropathy);setNeuropathyRisk(neuropathy)}}).catch(()=>{});return()=>{active=false}},[]);const metrics=healthMetrics.map(metric=>metric.name==="Nephropathy risk"&&nephropathyRisk?{...metric,value:`${nephropathyRisk.probability}%`,status:nephropathyRisk.category}:metric.name==="Neuropathy risk"&&neuropathyRisk?{...metric,value:`${neuropathyRisk.probability}%`,status:neuropathyRisk.category}:metric);
-  return <><section className="welcome"><div><p className="eyebrow">SATURDAY, 1 AUGUST 2026</p><h2>Good morning, Sarah <span>👋</span></h2><p>Here’s a clear look at how you’re doing today.</p></div><button className="secondary" onClick={() => go("assistant")}><Sparkles size={18}/> Ask your health assistant</button></section><section className="status-banner"><span className="status-icon"><ShieldCheck/></span><div><p className="eyebrow">YOUR HEALTH AT A GLANCE</p><h3>Your condition is currently stable.</h3><p>Your latest results are within your usual range. Keep following your medication and care plan.</p></div><StatusBadge status="Stable"/></section><Notice>This summary is for informational purposes and does not replace advice from your healthcare provider.</Notice><section className="metric-grid">{metrics.map((m, i) => {const risk=m.name==="Nephropathy risk"?nephropathyRisk:m.name==="Neuropathy risk"?neuropathyRisk:null;return <article className={`metric-card ${risk?`risk-highlight ${risk.category.toLowerCase().split(" ")[0]}`:""}`} key={m.name}><div className="metric-top"><span className={`metric-icon c${i}`}><m.icon/></span><StatusBadge status={m.status}/></div><p>{m.name}</p><h3>{m.value}</h3><small>{m.range}</small><div className="divider"/><p className="explain">{m.explanation}</p><time>{m.date}</time></article>})}</section><section className="dashboard-grid"><article className="card summary-card"><div className="card-head"><div><p className="eyebrow">FROM YOUR CLINICAL NOTES</p><h3>Recent health summary</h3></div><span className="soft-icon"><ClipboardList/></span></div><blockquote>“Your blood sugar control has improved slightly since your previous appointment. Your kidney function is currently stable.”</blockquote><p>Continue taking your prescribed medication and be mindful of carbohydrate portions.</p><div className="button-row"><button className="primary" onClick={() => go("summary")}>View full summary</button><button className="secondary" onClick={() => go("assistant")}><MessageCircle/> Ask AI about this</button></div></article><article className="card chart-card"><div className="card-head"><div><p className="eyebrow">6-MONTH TREND</p><h3>HbA1c is moving down</h3></div><StatusBadge status="Improving"/></div><TrendChart/><p className="chart-foot"><span/> Your latest reading is 0.4% lower than February.</p></article></section><section className="section-block"><div className="section-title"><div><p className="eyebrow">CARE PLAN</p><h2>Your next steps</h2></div><button className="link" onClick={() => go("summary")}>View care plan →</button></div><div className="steps-grid">{[{icon:Pill,title:"Take your medication",text:"Metformin 500 mg · Twice daily",done:true},{icon:TestTube2,title:"Complete your blood test",text:"Due before 15 August",done:false},{icon:CalendarDays,title:"Attend your appointment",text:"20 August · 10:30 AM",done:false},{icon:Activity,title:"Know low sugar signs",text:"Review the warning signs",done:false}].map(s => <article className="step" key={s.title}><span className={s.done ? "step-done" : ""}>{s.done ? "✓" : <s.icon/>}</span><div><h4>{s.title}</h4><p>{s.text}</p></div></article>)}</div></section><article className="appointment"><span><CalendarDays/></span><div><p className="eyebrow">UPCOMING APPOINTMENT</p><h3>{appointments[0].type}</h3><p>{appointments[0].doctor} · Diabetes Clinic</p></div><div className="appointment-date"><strong>20</strong><span>AUG 2026</span></div><button className="secondary">View details</button></article></>;
+  const [nephropathyRisk, setNephropathyRisk] = useState<Awaited<
+    ReturnType<typeof predictNephropathyRisk>
+  > | null>(null);
+  const [neuropathyRisk, setNeuropathyRisk] = useState<Awaited<
+    ReturnType<typeof predictNeuropathyRisk>
+  > | null>(null);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      predictNephropathyRisk(nephropathyModelInput),
+      predictNeuropathyRisk(neuropathyModelInput),
+    ])
+      .then(([nephropathy, neuropathy]) => {
+        if (active) {
+          setNephropathyRisk(nephropathy);
+          setNeuropathyRisk(neuropathy);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const metrics = healthMetrics.map((metric) =>
+    metric.name === "Nephropathy risk" && nephropathyRisk
+      ? {
+          ...metric,
+          value: `${nephropathyRisk.probability}%`,
+          status: nephropathyRisk.category,
+        }
+      : metric.name === "Neuropathy risk" && neuropathyRisk
+        ? {
+            ...metric,
+            value: `${neuropathyRisk.probability}%`,
+            status: neuropathyRisk.category,
+          }
+        : metric,
+  );
+  return (
+    <>
+      <section className="welcome">
+        <div>
+          <p className="eyebrow">SATURDAY, 1 AUGUST 2026</p>
+          <h2>
+            Good morning, Sarah <span>👋</span>
+          </h2>
+          <p>Here’s a clear look at how you’re doing today.</p>
+        </div>
+        <button className="secondary" onClick={() => go("assistant")}>
+          <Sparkles size={18} /> Ask your health assistant
+        </button>
+      </section>
+      <section className="status-banner">
+        <span className="status-icon">
+          <ShieldCheck />
+        </span>
+        <div>
+          <p className="eyebrow">YOUR HEALTH AT A GLANCE</p>
+          <h3>Your condition is currently stable.</h3>
+          <p>
+            Your latest results are within your usual range. Keep following your
+            medication and care plan.
+          </p>
+        </div>
+        <StatusBadge status="Stable" />
+      </section>
+      <Notice>
+        This summary is for informational purposes and does not replace advice
+        from your healthcare provider.
+      </Notice>
+      <section className="metric-grid">
+        {metrics.map((m, i) => {
+          const risk =
+            m.name === "Nephropathy risk"
+              ? nephropathyRisk
+              : m.name === "Neuropathy risk"
+                ? neuropathyRisk
+                : null;
+          return (
+            <article
+              className={`metric-card ${risk ? `risk-highlight ${risk.category.toLowerCase().split(" ")[0]}` : ""}`}
+              key={m.name}
+            >
+              <div className="metric-top">
+                <span className={`metric-icon c${i}`}>
+                  <m.icon />
+                </span>
+                <StatusBadge status={m.status} />
+              </div>
+              <p>{m.name}</p>
+              <h3>{m.value}</h3>
+              <small>{m.range}</small>
+              <div className="divider" />
+              <p className="explain">{m.explanation}</p>
+              <time>{m.date}</time>
+            </article>
+          );
+        })}
+      </section>
+      <section className="dashboard-grid">
+        <article className="card summary-card">
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">FROM YOUR CLINICAL NOTES</p>
+              <h3>Recent health summary</h3>
+            </div>
+            <span className="soft-icon">
+              <ClipboardList />
+            </span>
+          </div>
+          <blockquote>
+            “Your blood sugar control has improved slightly since your previous
+            appointment. Your kidney function is currently stable.”
+          </blockquote>
+          <p>
+            Continue taking your prescribed medication and be mindful of
+            carbohydrate portions.
+          </p>
+          <div className="button-row">
+            <button className="primary" onClick={() => go("summary")}>
+              View full summary
+            </button>
+            <button className="secondary" onClick={() => go("assistant")}>
+              <MessageCircle /> Ask AI about this
+            </button>
+          </div>
+        </article>
+        <article className="card chart-card">
+          <div className="card-head">
+            <div>
+              <p className="eyebrow">6-MONTH TREND</p>
+              <h3>HbA1c is moving down</h3>
+            </div>
+            <StatusBadge status="Improving" />
+          </div>
+          <TrendChart />
+          <p className="chart-foot">
+            <span /> Your latest reading is 0.4% lower than February.
+          </p>
+        </article>
+      </section>
+      <section className="section-block">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">CARE PLAN</p>
+            <h2>Your next steps</h2>
+          </div>
+          <button className="link" onClick={() => go("summary")}>
+            View care plan →
+          </button>
+        </div>
+        <div className="steps-grid">
+          {[
+            {
+              icon: Pill,
+              title: "Take your medication",
+              text: "Metformin 500 mg · Twice daily",
+              done: true,
+            },
+            {
+              icon: TestTube2,
+              title: "Complete your blood test",
+              text: "Due before 15 August",
+              done: false,
+            },
+            {
+              icon: CalendarDays,
+              title: "Attend your appointment",
+              text: "20 August · 10:30 AM",
+              done: false,
+            },
+            {
+              icon: Activity,
+              title: "Know low sugar signs",
+              text: "Review the warning signs",
+              done: false,
+            },
+          ].map((s) => (
+            <article className="step" key={s.title}>
+              <span className={s.done ? "step-done" : ""}>
+                {s.done ? "✓" : <s.icon />}
+              </span>
+              <div>
+                <h4>{s.title}</h4>
+                <p>{s.text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+      <article className="appointment">
+        <span>
+          <CalendarDays />
+        </span>
+        <div>
+          <p className="eyebrow">UPCOMING APPOINTMENT</p>
+          <h3>{appointments[0].type}</h3>
+          <p>{appointments[0].doctor} · Diabetes Clinic</p>
+        </div>
+        <div className="appointment-date">
+          <strong>20</strong>
+          <span>AUG 2026</span>
+        </div>
+        <button className="secondary">View details</button>
+      </article>
+    </>
+  );
 }
 
-function TrendChart({ data = trendData }: { data?: typeof trendData }) { return <div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data} margin={{top:12,right:8,left:-24,bottom:0}}><defs><linearGradient id="careFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#168fe8" stopOpacity={.25}/><stop offset="100%" stopColor="#168fe8" stopOpacity={.01}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#dce7f0"/><XAxis dataKey="month" interval={0} axisLine={false} tickLine={false} tick={{fill:"#647b8d",fontSize:12}}/><YAxis domain={[6.5,8]} axisLine={false} tickLine={false} tick={{fill:"#647b8d",fontSize:12}}/><Tooltip contentStyle={{borderRadius:12,border:"1px solid #dce7f0"}}/><Area type="monotone" dataKey="value" stroke="#168fe8" strokeWidth={3} fill="url(#careFill)" dot={{r:4,fill:"#fff",stroke:"#168fe8",strokeWidth:2}}/></AreaChart></ResponsiveContainer></div> }
+function TrendChart({ data = trendData }: { data?: typeof trendData }) {
+  return (
+    <div className="chart">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={data}
+          margin={{ top: 12, right: 8, left: -24, bottom: 0 }}
+        >
+          <defs>
+            <linearGradient id="careFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#168fe8" stopOpacity={0.25} />
+              <stop offset="100%" stopColor="#168fe8" stopOpacity={0.01} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="#dce7f0"
+          />
+          <XAxis
+            dataKey="month"
+            interval={0}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: "#647b8d", fontSize: 12 }}
+          />
+          <YAxis
+            domain={[6.5, 8]}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: "#647b8d", fontSize: 12 }}
+          />
+          <Tooltip
+            contentStyle={{ borderRadius: 12, border: "1px solid #dce7f0" }}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="#168fe8"
+            strokeWidth={3}
+            fill="url(#careFill)"
+            dot={{ r: 4, fill: "#fff", stroke: "#168fe8", strokeWidth: 2 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 function SummaryPage({ go }: { go: (p: Page) => void }) {
   const [original, setOriginal] = useState(false);
-  return <><div className="page-intro"><div><p className="eyebrow">LAST UPDATED 28 JULY 2026</p><h2>Your Clinical Notes, Explained Simply</h2><p>A patient-friendly explanation of your latest visit with Dr. Lim.</p></div><button className="secondary" onClick={() => setOriginal(!original)}><Eye size={18}/>{original ? "Hide" : "View"} original notes</button></div><Notice kind="warning">AI-generated summaries may contain errors. Please verify important information with your healthcare provider.</Notice>{original && <article className="card original"><p className="eyebrow">ORIGINAL CLINICAL NOTES</p><p>54F, T2DM x9y. Glycaemic control improving; HbA1c 7.1% (prev 7.5%). BP controlled. Renal profile stable, eGFR 82. Continue metformin 500mg BD. Counselled diet/exercise. Repeat FBC, RP, HbA1c in 3/12.</p></article>}<div className="summary-layout"><div className="summary-sections">{clinicalSummary.sections.map((s, i) => <article className="card summary-section" key={s.title}><span className={`number n${i}`}>{i+1}</span><div><h3>{s.title}</h3><p>{s.text}</p>{s.items && <ul>{s.items.map(x => <li key={x}>{x}</li>)}</ul>}</div></article>)}</div><aside><article className="card sticky-card"><span className="hero-icon small"><Sparkles/></span><h3>Have a question?</h3><p>Ask the health assistant to explain any part of your summary in simpler words.</p><button className="primary wide" onClick={() => go("assistant")}><MessageCircle/> Ask AI about this summary</button></article><article className="card care-contact"><p className="eyebrow">YOUR CARE TEAM</p><h3>Dr. Michelle Lim</h3><p>Diabetes Clinic · Klinik Kesihatan</p><button className="link">View clinic details →</button></article></aside></div></>;
+  return (
+    <>
+      <div className="page-intro">
+        <div>
+          <p className="eyebrow">LAST UPDATED 28 JULY 2026</p>
+          <h2>Your Clinical Notes, Explained Simply</h2>
+          <p>
+            A patient-friendly explanation of your latest visit with Dr. Lim.
+          </p>
+        </div>
+        <button className="secondary" onClick={() => setOriginal(!original)}>
+          <Eye size={18} />
+          {original ? "Hide" : "View"} original notes
+        </button>
+      </div>
+      <Notice kind="warning">
+        AI-generated summaries may contain errors. Please verify important
+        information with your healthcare provider.
+      </Notice>
+      {original && (
+        <article className="card original">
+          <p className="eyebrow">ORIGINAL CLINICAL NOTES</p>
+          <p>
+            54F, T2DM x9y. Glycaemic control improving; HbA1c 7.1% (prev 7.5%).
+            BP controlled. Renal profile stable, eGFR 82. Continue metformin
+            500mg BD. Counselled diet/exercise. Repeat FBC, RP, HbA1c in 3/12.
+          </p>
+        </article>
+      )}
+      <div className="summary-layout">
+        <div className="summary-sections">
+          {clinicalSummary.sections.map((s, i) => (
+            <article className="card summary-section" key={s.title}>
+              <span className={`number n${i}`}>{i + 1}</span>
+              <div>
+                <h3>{s.title}</h3>
+                <p>{s.text}</p>
+                {s.items && (
+                  <ul>
+                    {s.items.map((x) => (
+                      <li key={x}>{x}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+        <aside>
+          <article className="card sticky-card">
+            <span className="hero-icon small">
+              <Sparkles />
+            </span>
+            <h3>Have a question?</h3>
+            <p>
+              Ask the health assistant to explain any part of your summary in
+              simpler words.
+            </p>
+            <button className="primary wide" onClick={() => go("assistant")}>
+              <MessageCircle /> Ask AI about this summary
+            </button>
+          </article>
+          <article className="card care-contact">
+            <p className="eyebrow">YOUR CARE TEAM</p>
+            <h3>Dr. Michelle Lim</h3>
+            <p>Diabetes Clinic · Klinik Kesihatan</p>
+            <button className="link">View clinic details →</button>
+          </article>
+        </aside>
+      </div>
+    </>
+  );
 }
 
-const starters = ["What does my HbA1c result mean?","Is my kidney function normal?","What foods can affect my blood sugar?","What should I ask my doctor?","Explain my latest health summary","What are symptoms of low blood sugar?","What is my exact diagnosis, and what does it mean?","What caused this condition, and are there other possible causes?","Is it contagious? Could it affect other parts of my body?","What is the long-term outlook, and what are the possible complications?","What are my treatment options, and what are the pros and cons?","What are the possible side effects, and how can I manage them?"];
-function AssistantPage() {
-  const initial: ChatMessage[] = [{id:"1",role:"assistant",content:"Hello Sarah — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?",time:"9:41 AM"}];
-  const [messages,setMessages] = useState(initial), [text,setText] = useState(""), [typing,setTyping] = useState(false);
-  async function send(value = text) { if(!value.trim()||typing) return; const msg: ChatMessage={id:crypto.randomUUID(),role:"user",content:value,time:"Now"}; const conversation=[...messages,msg]; setMessages(conversation); setText(""); setTyping(true); try{const reply=await sendMessageToLlama(value,{conversation});setMessages(m=>[...m,{id:crypto.randomUUID(),role:"assistant",content:reply,time:"Now"}])}catch(error){setMessages(m=>[...m,{id:crypto.randomUUID(),role:"assistant",content:error instanceof Error?error.message:"The health assistant is temporarily unavailable. Please try again.",time:"Now"}])}finally{setTyping(false)} }
-  return <><div className="page-intro"><div><p className="eyebrow">GROQ · LLAMA 3.3 70B</p><h2>AI Health Assistant</h2><p>Ask questions about your diabetes, results, and care plan.</p></div><button className="secondary" onClick={()=>setMessages(initial)}><Trash2 size={17}/> Clear conversation</button></div><Notice kind="warning">This AI provides general educational information. It does not diagnose, prescribe treatment, or replace your doctor.</Notice><div className="chat-shell"><div className="chat-head"><div className="bot-avatar"><Bot/></div><div><h3>Care Assistant</h3><p><span/> Powered by Llama 3.3 70B</p></div><button className="icon-button" onClick={()=>setMessages(initial)} aria-label="New conversation">+</button></div><div className="chat-body">{messages.map(m=><div className={`message-row ${m.role}`} key={m.id}>{m.role==="assistant"&&<div className="mini-bot"><Sparkles/></div>}<div><div className="bubble">{m.content}</div><time>{m.time}</time></div></div>)}{typing&&<div className="message-row assistant"><div className="mini-bot"><Sparkles/></div><div className="bubble typing"><i/><i/><i/></div></div>}</div><div className="suggestions" aria-label="Suggested questions">{starters.map(s=><button key={s} onClick={()=>send(s)} disabled={typing}>{s}</button>)}</div><form className="chat-input" onSubmit={e=>{e.preventDefault();send();}}><input value={text} onChange={e=>setText(e.target.value)} placeholder="Ask about your health records…" aria-label="Message" disabled={typing}/><button type="submit" aria-label="Send message" disabled={typing||!text.trim()}><Send/></button></form><p className="chat-disclaimer">AI can make mistakes. Check important information with your care team.</p></div></>;
+const starters = [
+  "What does my HbA1c result mean?",
+  "Is my kidney function normal?",
+  "What foods can affect my blood sugar?",
+  "What should I ask my doctor?",
+  "Explain my latest health summary",
+  "What are symptoms of low blood sugar?",
+  "What is my exact diagnosis, and what does it mean?",
+  "What caused this condition, and are there other possible causes?",
+  "Is it contagious? Could it affect other parts of my body?",
+  "What is the long-term outlook, and what are the possible complications?",
+  "What are my treatment options, and what are the pros and cons?",
+  "What are the possible side effects, and how can I manage them?",
+];
+function AssistantPage({ language }: { language: Language }) {
+  const initial: ChatMessage[] = [
+    {
+      id: "1",
+      role: "assistant",
+      content:
+        "Hello Sarah — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?",
+      time: "9:41 AM",
+    },
+  ];
+  const [messages, setMessages] = useState(initial),
+    [text, setText] = useState(""),
+    [typing, setTyping] = useState(false);
+  async function send(value = text) {
+    if (!value.trim() || typing) return;
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: value,
+      time: "Now",
+    };
+    const conversation = [...messages, msg];
+    setMessages(conversation);
+    setText("");
+    setTyping(true);
+    try {
+      const reply = await sendMessageToLlama(value, { conversation, language });
+      setMessages((m) => [
+        ...m,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: reply,
+          time: "Now",
+        },
+      ]);
+    } catch (error) {
+      setMessages((m) => [
+        ...m,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            error instanceof Error
+              ? error.message
+              : "The health assistant is temporarily unavailable. Please try again.",
+          time: "Now",
+        },
+      ]);
+    } finally {
+      setTyping(false);
+    }
+  }
+  return (
+    <>
+      <div className="page-intro">
+        <div>
+          <p className="eyebrow">GROQ · LLAMA 3.3 70B</p>
+          <h2>AI Health Assistant</h2>
+          <p>Ask questions about your diabetes, results, and care plan.</p>
+        </div>
+        <button className="secondary" onClick={() => setMessages(initial)}>
+          <Trash2 size={17} /> Clear conversation
+        </button>
+      </div>
+      <Notice kind="warning">
+        This AI provides general educational information. It does not diagnose,
+        prescribe treatment, or replace your doctor.
+      </Notice>
+      <div className="chat-shell">
+        <div className="chat-head">
+          <div className="bot-avatar">
+            <Bot />
+          </div>
+          <div>
+            <h3>Care Assistant</h3>
+            <p>
+              <span /> Powered by Llama 3.3 70B
+            </p>
+          </div>
+          <button
+            className="icon-button"
+            onClick={() => setMessages(initial)}
+            aria-label="New conversation"
+          >
+            +
+          </button>
+        </div>
+        <div className="chat-body">
+          {messages.map((m) => (
+            <div className={`message-row ${m.role}`} key={m.id}>
+              {m.role === "assistant" && (
+                <div className="mini-bot">
+                  <Sparkles />
+                </div>
+              )}
+              <div>
+                <div className="bubble">{m.content}</div>
+                <time>{m.time}</time>
+              </div>
+            </div>
+          ))}
+          {typing && (
+            <div className="message-row assistant">
+              <div className="mini-bot">
+                <Sparkles />
+              </div>
+              <div className="bubble typing">
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="suggestions" aria-label="Suggested questions">
+          {starters.map((s) => (
+            <button key={s} onClick={() => send(s)} disabled={typing}>
+              {s}
+            </button>
+          ))}
+        </div>
+        <form
+          className="chat-input"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
+        >
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Ask about your health records…"
+            aria-label="Message"
+            disabled={typing}
+          />
+          <button
+            type="submit"
+            aria-label="Send message"
+            disabled={typing || !text.trim()}
+          >
+            <Send />
+          </button>
+        </form>
+        <p className="chat-disclaimer">
+          AI can make mistakes. Check important information with your care team.
+        </p>
+      </div>
+    </>
+  );
 }
 
 type RiskResult = Awaited<ReturnType<typeof predictNephropathyRisk>>;
 
-function RiskCard({title,kind,result}:{title:string;kind:"nephropathy"|"neuropathy";result:RiskResult}){
-  const Icon=kind==="nephropathy"?KidneysIcon:HeartPulse;
-  const recommendation=kind==="nephropathy"?"Discuss this estimate and your kidney test trends with your doctor.":"Discuss this estimate and any tingling, burning, numbness, pain, or loss of sensation with your doctor.";
-  const description=kind==="nephropathy"?"Nephropathy is kidney damage that can develop when diabetes affects the kidneys’ tiny blood-filtering vessels.":"Neuropathy is nerve damage that can cause tingling, burning, pain, or numbness, especially in the feet and legs.";
-  return <article className={`risk-result automatic risk-box ${result.category.toLowerCase().split(" ")[0]}`}><div className="risk-title"><span className="soft-icon"><Icon/></span><div><p className="eyebrow">RANDOM FOREST ESTIMATE</p><h3>{title}</h3></div><StatusBadge status={result.category}/></div><p className="risk-description">{description}</p><div className="severity prominent"><div className="severity-label"><span>Risk progression</span><strong>{result.probability}%</strong></div><div className="severity-track" role="meter" aria-label={`${title} progression`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={result.probability}><span style={{width:`${result.probability}%`}}/></div><div className="severity-scale"><span>0% · Low</span><span>30% · Moderate</span><span>60% · High</span><span>100%</span></div></div><div className="risk-value"><strong>{result.probability}%</strong><span>estimated probability</span></div><p>{result.explanation}</p><div className="divider"/><h4>Information used by the model</h4><ul>{result.factors.map(x=><li key={x}><span>✓</span>{x}</li>)}</ul><h4>Recommended next step</h4><p>{recommendation} Do not change medication or care based on this result.</p><time>Blood test record · 28 July 2026</time><div className="model-performance"><span>Model test accuracy <b>{(result.modelAccuracy*100).toFixed(2)}%</b></span><span>Model ROC-AUC <b>{result.rocAuc.toFixed(4)}</b></span></div></article>;
+function RiskCard({
+  title,
+  kind,
+  result,
+}: {
+  title: string;
+  kind: "nephropathy" | "neuropathy";
+  result: RiskResult;
+}) {
+  const Icon = kind === "nephropathy" ? KidneysIcon : HeartPulse;
+  const recommendation =
+    kind === "nephropathy"
+      ? "Discuss this estimate and your kidney test trends with your doctor."
+      : "Discuss this estimate and any tingling, burning, numbness, pain, or loss of sensation with your doctor.";
+  const description =
+    kind === "nephropathy"
+      ? "Nephropathy is kidney damage that can develop when diabetes affects the kidneys’ tiny blood-filtering vessels."
+      : "Neuropathy is nerve damage that can cause tingling, burning, pain, or numbness, especially in the feet and legs.";
+  return (
+    <article
+      className={`risk-result automatic risk-box ${result.category.toLowerCase().split(" ")[0]}`}
+    >
+      <div className="risk-title">
+        <span className="soft-icon">
+          <Icon />
+        </span>
+        <div>
+          <p className="eyebrow">RANDOM FOREST ESTIMATE</p>
+          <h3>{title}</h3>
+        </div>
+        <StatusBadge status={result.category} />
+      </div>
+      <p className="risk-description">{description}</p>
+      <div className="severity prominent">
+        <div className="severity-label">
+          <span>Risk progression</span>
+          <strong>{result.probability}%</strong>
+        </div>
+        <div
+          className="severity-track"
+          role="meter"
+          aria-label={`${title} progression`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={result.probability}
+        >
+          <span style={{ width: `${result.probability}%` }} />
+        </div>
+        <div className="severity-scale">
+          <span>0% · Low</span>
+          <span>30% · Moderate</span>
+          <span>60% · High</span>
+          <span>100%</span>
+        </div>
+      </div>
+      <div className="risk-value">
+        <strong>{result.probability}%</strong>
+        <span>estimated probability</span>
+      </div>
+      <p>{result.explanation}</p>
+      <div className="divider" />
+      <h4>Information used by the model</h4>
+      <ul>
+        {result.factors.map((x) => (
+          <li key={x}>
+            <span>✓</span>
+            {x}
+          </li>
+        ))}
+      </ul>
+      <h4>Recommended next step</h4>
+      <p>
+        {recommendation} Do not change medication or care based on this result.
+      </p>
+      <time>Blood test record · 28 July 2026</time>
+      <div className="model-performance">
+        <span>
+          Model test accuracy <b>{(result.modelAccuracy * 100).toFixed(2)}%</b>
+        </span>
+        <span>
+          Model ROC-AUC <b>{result.rocAuc.toFixed(4)}</b>
+        </span>
+      </div>
+    </article>
+  );
 }
 
-function PossibleRisksPage(){
-  const [nephropathy,setNephropathy]=useState<RiskResult|null>(null);
-  const [neuropathy,setNeuropathy]=useState<Awaited<ReturnType<typeof predictNeuropathyRisk>>|null>(null);
-  const [error,setError]=useState("");
-  useEffect(()=>{let active=true;Promise.all([predictNephropathyRisk(nephropathyModelInput),predictNeuropathyRisk(neuropathyModelInput)]).then(([neph,neuro])=>{if(active){setNephropathy(neph);setNeuropathy(neuro)}}).catch(()=>{if(active)setError("The Random Forest models could not be loaded. Please refresh and try again.")});return()=>{active=false}},[]);
-  return <><div className="page-intro"><div><p className="eyebrow">AUTOMATIC COMPLICATION ESTIMATES</p><h2>Possible Risks</h2><p>Two Random Forest models calculate possible diabetes-related complication risks from your latest record.</p></div><StatusBadge status="Random Forest only"/></div><Notice kind="warning">These probabilities are model estimates, not diagnoses. They should be reviewed by a qualified healthcare professional.</Notice>{error?<article className="card empty-result"><span><Info/></span><h3>Unable to calculate risks</h3><p>{error}</p></article>:!nephropathy||!neuropathy?<article className="card empty-result"><span><Activity/></span><h3>Calculating possible risks…</h3><p>Loading both fitted Random Forest models. No manual input is needed.</p></article>:<div className="possible-risks-grid"><RiskCard title="Nephropathy risk" kind="nephropathy" result={nephropathy}/><RiskCard title="Neuropathy risk" kind="neuropathy" result={neuropathy}/></div>}</>;
+function PossibleRisksPage() {
+  const [nephropathy, setNephropathy] = useState<RiskResult | null>(null);
+  const [neuropathy, setNeuropathy] = useState<Awaited<
+    ReturnType<typeof predictNeuropathyRisk>
+  > | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      predictNephropathyRisk(nephropathyModelInput),
+      predictNeuropathyRisk(neuropathyModelInput),
+    ])
+      .then(([neph, neuro]) => {
+        if (active) {
+          setNephropathy(neph);
+          setNeuropathy(neuro);
+        }
+      })
+      .catch(() => {
+        if (active)
+          setError(
+            "The Random Forest models could not be loaded. Please refresh and try again.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return (
+    <>
+      <div className="page-intro">
+        <div>
+          <p className="eyebrow">AUTOMATIC COMPLICATION ESTIMATES</p>
+          <h2>Possible Risks</h2>
+          <p>
+            Two Random Forest models calculate possible diabetes-related
+            complication risks from your latest record.
+          </p>
+        </div>
+        <StatusBadge status="Random Forest only" />
+      </div>
+      <Notice kind="warning">
+        These probabilities are model estimates, not diagnoses. They should be
+        reviewed by a qualified healthcare professional.
+      </Notice>
+      {error ? (
+        <article className="card empty-result">
+          <span>
+            <Info />
+          </span>
+          <h3>Unable to calculate risks</h3>
+          <p>{error}</p>
+        </article>
+      ) : !nephropathy || !neuropathy ? (
+        <article className="card empty-result">
+          <span>
+            <Activity />
+          </span>
+          <h3>Calculating possible risks…</h3>
+          <p>
+            Loading both fitted Random Forest models. No manual input is needed.
+          </p>
+        </article>
+      ) : (
+        <div className="possible-risks-grid">
+          <RiskCard
+            title="Nephropathy risk"
+            kind="nephropathy"
+            result={nephropathy}
+          />
+          <RiskCard
+            title="Neuropathy risk"
+            kind="neuropathy"
+            result={neuropathy}
+          />
+        </div>
+      )}
+    </>
+  );
 }
 
-function ResultsPage(){const [filter,setFilter]=useState("Latest results"),[selected,setSelected]=useState(bloodTests[0]); const visible=bloodTests.filter(t=>filter==="Abnormal results"?t.status!=="Normal":filter==="Kidney-related"?t.category==="Kidney":filter==="Diabetes-related"?t.category==="Diabetes":true);return <><div className="page-intro"><div><p className="eyebrow">LATEST PANEL · 28 JULY 2026</p><h2>Blood Test Results</h2><p>Your lab results, explained in patient-friendly language.</p></div><button className="secondary">Download report</button></div><div className="filter-row">{["Latest results","Abnormal results","Diabetes-related","Kidney-related"].map(x=><button className={filter===x?"active":""} onClick={()=>setFilter(x)} key={x}>{x}</button>)}</div><div className="results-layout"><div className="results-table"><div className="table-head"><span>Test</span><span>Result</span><span>Reference range</span><span>Status</span><span>Date</span></div>{visible.map(t=><button className={`table-row ${selected.name===t.name?"selected":""}`} onClick={()=>setSelected(t)} key={t.name}><span><b>{t.name}</b><small>{t.category}</small></span><span><strong>{t.value}</strong> {t.unit}</span><span>{t.range}</span><span><StatusBadge status={t.status}/></span><span>{t.date}</span></button>)}</div><aside className="card result-detail"><p className="eyebrow">RESULT EXPLAINED</p><span className="soft-icon"><Droplets/></span><h3>{selected.name}</h3><div className="detail-value"><strong>{selected.value}</strong><span>{selected.unit}</span></div><StatusBadge status={selected.status}/><p>{selected.explanation}</p><div className="mini-chart"><TrendChart data={selected.trend}/></div><Notice>One result alone does not tell the full story. Your doctor will consider this alongside your overall health.</Notice></aside></div></>}
+function ResultsPage() {
+  const [filter, setFilter] = useState("Latest results"),
+    [selected, setSelected] = useState(bloodTests[0]);
+  const visible = bloodTests.filter((t) =>
+    filter === "Abnormal results"
+      ? t.status !== "Normal"
+      : filter === "Kidney-related"
+        ? t.category === "Kidney"
+        : filter === "Diabetes-related"
+          ? t.category === "Diabetes"
+          : true,
+  );
+  return (
+    <>
+      <div className="page-intro">
+        <div>
+          <p className="eyebrow">LATEST PANEL · 28 JULY 2026</p>
+          <h2>Blood Test Results</h2>
+          <p>Your lab results, explained in patient-friendly language.</p>
+        </div>
+        <button className="secondary">Download report</button>
+      </div>
+      <div className="filter-row">
+        {[
+          "Latest results",
+          "Abnormal results",
+          "Diabetes-related",
+          "Kidney-related",
+        ].map((x) => (
+          <button
+            className={filter === x ? "active" : ""}
+            onClick={() => setFilter(x)}
+            key={x}
+          >
+            {x}
+          </button>
+        ))}
+      </div>
+      <div className="results-layout">
+        <div className="results-table">
+          <div className="table-head">
+            <span>Test</span>
+            <span>Result</span>
+            <span>Reference range</span>
+            <span>Status</span>
+            <span>Date</span>
+          </div>
+          {visible.map((t) => (
+            <button
+              className={`table-row ${selected.name === t.name ? "selected" : ""}`}
+              onClick={() => setSelected(t)}
+              key={t.name}
+            >
+              <span>
+                <b>{t.name}</b>
+                <small>{t.category}</small>
+              </span>
+              <span>
+                <strong>{t.value}</strong> {t.unit}
+              </span>
+              <span>{t.range}</span>
+              <span>
+                <StatusBadge status={t.status} />
+              </span>
+              <span>{t.date}</span>
+            </button>
+          ))}
+        </div>
+        <aside className="card result-detail">
+          <p className="eyebrow">RESULT EXPLAINED</p>
+          <span className="soft-icon">
+            <Droplets />
+          </span>
+          <h3>{selected.name}</h3>
+          <div className="detail-value">
+            <strong>{selected.value}</strong>
+            <span>{selected.unit}</span>
+          </div>
+          <StatusBadge status={selected.status} />
+          <p>{selected.explanation}</p>
+          <div className="mini-chart">
+            <TrendChart data={selected.trend} />
+          </div>
+          <Notice>
+            One result alone does not tell the full story. Your doctor will
+            consider this alongside your overall health.
+          </Notice>
+        </aside>
+      </div>
+    </>
+  );
+}
 
-function ProfilePage({logout}:{logout:()=>void}){const [large,setLarge]=useState(false),[dark,setDark]=useState(false);return <div className={`${large?"large-text":""} ${dark?"dark-card":""}`}><div className="page-intro"><div><p className="eyebrow">ACCOUNT & PREFERENCES</p><h2>Profile and Settings</h2><p>Manage your personal details and how CareLink works for you.</p></div></div><div className="profile-grid"><article className="card profile-card"><div className="profile-avatar">SA</div><h3>Sarah Ahmad</h3><p>Patient ID · CL-10482</p><StatusBadge status="Type 2 diabetes"/><div className="profile-fields"><div><small>Date of birth</small><strong>14 March 1972</strong></div><div><small>Contact</small><strong>+60 12-345 6789</strong></div><div><small>Email</small><strong>sarah.ahmad@example.com</strong></div><div><small>Preferred language</small><strong>English</strong></div></div><button className="secondary wide">Edit personal details</button></article><div className="settings-stack"><article className="card settings-card"><h3>Care information</h3><div className="setting-line"><span><Stethoscope/><span><b>Primary doctor</b><small>Dr. Michelle Lim</small></span></span><button>Manage</button></div><div className="setting-line"><span><HeartPulse/><span><b>Clinic</b><small>Klinik Kesihatan Diabetes Clinic</small></span></span><button>View</button></div><div className="setting-line"><span><User/><span><b>Emergency contact</b><small>Ahmad Zain · Spouse</small></span></span><button>Edit</button></div></article><article className="card settings-card"><h3>Accessibility & appearance</h3><div className="setting-line"><span><Activity/><span><b>Larger text</b><small>Increase text throughout the portal</small></span></span><button className={`toggle ${large?"on":""}`} onClick={()=>setLarge(!large)} aria-label="Toggle larger text"><i/></button></div><div className="setting-line"><span><Moon/><span><b>Dark mode</b><small>Reduce brightness in low light</small></span></span><button className={`toggle ${dark?"on":""}`} onClick={()=>setDark(!dark)} aria-label="Toggle dark mode"><i/></button></div><div className="setting-line"><span><Bell/><span><b>Notifications</b><small>Appointments and test reminders</small></span></span><button>Manage</button></div></article><article className="card settings-card privacy"><ShieldCheck/><div><h3>Your privacy matters</h3><p>Your health information is only shown within this private patient portal. Mock data is used in this prototype.</p><button className="link">Read privacy information →</button></div></article><button className="logout" onClick={logout}><LogOut/> Sign out of CareLink</button></div></div></div>}
+function ProfilePage({
+  logout,
+  language,
+}: {
+  logout: () => void;
+  language: Language;
+}) {
+  const [large, setLarge] = useState(false),
+    [dark, setDark] = useState(false);
+  return (
+    <div className={`${large ? "large-text" : ""} ${dark ? "dark-card" : ""}`}>
+      <div className="page-intro">
+        <div>
+          <p className="eyebrow">ACCOUNT & PREFERENCES</p>
+          <h2>Profile and Settings</h2>
+          <p>Manage your personal details and how CareLink works for you.</p>
+        </div>
+      </div>
+      <div className="profile-grid">
+        <article className="card profile-card">
+          <div className="profile-avatar">SA</div>
+          <h3>Sarah Ahmad</h3>
+          <p>Patient ID · CL-10482</p>
+          <StatusBadge status="Type 2 diabetes" />
+          <div className="profile-fields">
+            <div>
+              <small>Date of birth</small>
+              <strong>14 March 1972</strong>
+            </div>
+            <div>
+              <small>Contact</small>
+              <strong>+60 12-345 6789</strong>
+            </div>
+            <div>
+              <small>Email</small>
+              <strong>sarah.ahmad@example.com</strong>
+            </div>
+            <div>
+              <small>Preferred language</small>
+              <strong>{language === "ms" ? "Bahasa Melayu" : "English"}</strong>
+            </div>
+          </div>
+          <button className="secondary wide">Edit personal details</button>
+        </article>
+        <div className="settings-stack">
+          <article className="card settings-card">
+            <h3>Care information</h3>
+            <div className="setting-line">
+              <span>
+                <Stethoscope />
+                <span>
+                  <b>Primary doctor</b>
+                  <small>Dr. Michelle Lim</small>
+                </span>
+              </span>
+              <button>Manage</button>
+            </div>
+            <div className="setting-line">
+              <span>
+                <HeartPulse />
+                <span>
+                  <b>Clinic</b>
+                  <small>Klinik Kesihatan Diabetes Clinic</small>
+                </span>
+              </span>
+              <button>View</button>
+            </div>
+            <div className="setting-line">
+              <span>
+                <User />
+                <span>
+                  <b>Emergency contact</b>
+                  <small>Ahmad Zain · Spouse</small>
+                </span>
+              </span>
+              <button>Edit</button>
+            </div>
+          </article>
+          <article className="card settings-card">
+            <h3>Accessibility & appearance</h3>
+            <div className="setting-line">
+              <span>
+                <Activity />
+                <span>
+                  <b>Larger text</b>
+                  <small>Increase text throughout the portal</small>
+                </span>
+              </span>
+              <button
+                className={`toggle ${large ? "on" : ""}`}
+                onClick={() => setLarge(!large)}
+                aria-label="Toggle larger text"
+              >
+                <i />
+              </button>
+            </div>
+            <div className="setting-line">
+              <span>
+                <Moon />
+                <span>
+                  <b>Dark mode</b>
+                  <small>Reduce brightness in low light</small>
+                </span>
+              </span>
+              <button
+                className={`toggle ${dark ? "on" : ""}`}
+                onClick={() => setDark(!dark)}
+                aria-label="Toggle dark mode"
+              >
+                <i />
+              </button>
+            </div>
+            <div className="setting-line">
+              <span>
+                <Bell />
+                <span>
+                  <b>Notifications</b>
+                  <small>Appointments and test reminders</small>
+                </span>
+              </span>
+              <button>Manage</button>
+            </div>
+          </article>
+          <article className="card settings-card privacy">
+            <ShieldCheck />
+            <div>
+              <h3>Your privacy matters</h3>
+              <p>
+                Your health information is only shown within this private
+                patient portal. Mock data is used in this prototype.
+              </p>
+              <button className="link">Read privacy information →</button>
+            </div>
+          </article>
+          <button className="logout" onClick={logout}>
+            <LogOut /> Sign out of CareLink
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-export default function HomePage(){const [logged,setLogged]=useState(false),[page,setPage]=useState<Page>("dashboard"),[menu,setMenu]=useState(false);const title=useMemo(()=>nav.find(x=>x.id===page)?.label||"Home",[page]);if(!logged)return <Login onLogin={()=>setLogged(true)}/>;const go=(p:Page)=>{setPage(p);setMenu(false);window.scrollTo({top:0,behavior:"smooth"})};return <div className="app-shell"><aside className={`sidebar ${menu?"open":""}`}><div className="sidebar-top"><Brand/><button className="icon-button close-menu" onClick={()=>setMenu(false)}><X/></button></div><nav>{nav.map(n=><button className={page===n.id?"active":""} onClick={()=>go(n.id)} key={n.id}><n.icon/><span>{n.label}</span></button>)}</nav><div className="sidebar-help"><span><Stethoscope/></span><strong>Need help?</strong><p>Contact your care team for support.</p><button>Contact clinic</button></div><div className="sidebar-profile"><div className="avatar">SA</div><div><strong>Sarah Ahmad</strong><small>Patient · CL-10482</small></div><Settings size={18}/></div></aside>{menu&&<button className="overlay" onClick={()=>setMenu(false)} aria-label="Close menu"/>}<main className="main"><Header title={title} onMenu={()=>setMenu(true)}/><div className="content">{page==="dashboard"&&<Dashboard go={go}/>} {page==="summary"&&<SummaryPage go={go}/>} {page==="assistant"&&<AssistantPage/>} {page==="ckd"&&<PossibleRisksPage/>} {page==="results"&&<ResultsPage/>} {page==="profile"&&<ProfilePage logout={()=>setLogged(false)}/>}</div></main><nav className="bottom-nav">{nav.slice(0,5).map(n=><button className={page===n.id?"active":""} onClick={()=>go(n.id)} key={n.id}><n.icon/><span>{n.label}</span></button>)}</nav></div>}
+export default function HomePage() {
+  const [logged, setLogged] = useState(false),
+    [page, setPage] = useState<Page>("dashboard"),
+    [menu, setMenu] = useState(false),
+    [language, setLanguage] = useState<Language>("en");
+  useEffect(() => {
+    const saved = window.localStorage.getItem("carelink-language");
+    if (saved === "ms") setLanguage("ms");
+  }, []);
+  useEffect(() => applyLanguage(language), [language, page, logged]);
+  const changeLanguage = () =>
+    setLanguage((current) => {
+      const next = current === "en" ? "ms" : "en";
+      window.localStorage.setItem("carelink-language", next);
+      return next;
+    });
+  const title = useMemo(
+    () => nav.find((x) => x.id === page)?.label || "Home",
+    [page],
+  );
+  if (!logged) return <Login onLogin={() => setLogged(true)} />;
+  const go = (p: Page) => {
+    setPage(p);
+    setMenu(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${menu ? "open" : ""}`}>
+        <div className="sidebar-top">
+          <Brand />
+          <button
+            className="icon-button close-menu"
+            onClick={() => setMenu(false)}
+          >
+            <X />
+          </button>
+        </div>
+        <nav>
+          {nav.map((n) => (
+            <button
+              className={page === n.id ? "active" : ""}
+              onClick={() => go(n.id)}
+              key={n.id}
+            >
+              <n.icon />
+              <span>{n.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-help">
+          <span>
+            <Stethoscope />
+          </span>
+          <strong>Need help?</strong>
+          <p>Contact your care team for support.</p>
+          <button>Contact clinic</button>
+        </div>
+        <div className="sidebar-profile">
+          <div className="avatar">SA</div>
+          <div>
+            <strong>Sarah Ahmad</strong>
+            <small>Patient · CL-10482</small>
+          </div>
+          <Settings size={18} />
+        </div>
+      </aside>
+      {menu && (
+        <button
+          className="overlay"
+          onClick={() => setMenu(false)}
+          aria-label="Close menu"
+        />
+      )}
+      <main className="main">
+        <Header
+          title={title}
+          onMenu={() => setMenu(true)}
+          language={language}
+          onLanguageChange={changeLanguage}
+        />
+        <div className="content">
+          {page === "dashboard" && <Dashboard go={go} />}{" "}
+          {page === "summary" && <SummaryPage go={go} />}{" "}
+          {page === "assistant" && <AssistantPage language={language} />}{" "}
+          {page === "ckd" && <PossibleRisksPage />}{" "}
+          {page === "results" && <ResultsPage />}{" "}
+          {page === "profile" && (
+            <ProfilePage logout={() => setLogged(false)} language={language} />
+          )}
+        </div>
+      </main>
+      <nav className="bottom-nav">
+        {nav.slice(0, 5).map((n) => (
+          <button
+            className={page === n.id ? "active" : ""}
+            onClick={() => go(n.id)}
+            key={n.id}
+          >
+            <n.icon />
+            <span>{n.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}

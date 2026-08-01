@@ -1,8 +1,23 @@
 // TODO: Connect to the approved Llama API. Patient context must never be exposed without consent.
 // Until then, this topic router provides varied, transparent mock responses.
-export async function sendMessageToLlama(message: string, _patientContext: unknown): Promise<string> {
+type AssistantContext = {
+  conversation?: Array<{ role: "user" | "assistant"; content: string }>;
+};
+
+export async function sendMessageToLlama(message: string, patientContext: unknown): Promise<string> {
   await new Promise((resolve) => setTimeout(resolve, 650));
   const q = message.toLowerCase().trim();
+  const context = patientContext as AssistantContext;
+  const previousMessages = context.conversation?.slice(0, -1) ?? [];
+  const previousTopic = previousMessages.map((item) => item.content.toLowerCase()).join(" ");
+
+  if (/simpler|simple way|plain language|don't understand|do not understand|what does that mean|explain that/.test(q)) {
+    if (/nephropath/.test(previousTopic)) return "Nephropathy means kidney damage. Diabetes can slowly damage the tiny filters inside your kidneys. When those filters are damaged, the kidneys may not clean your blood as well as they should. Doctors use blood and urine tests to check for this. Your CareLink percentage only estimates risk—it does not mean you have kidney damage.";
+    if (/hba1c/.test(previousTopic)) return "HbA1c is a number that shows your average blood sugar during the last two to three months. Your result is 7.1%. The target shown in CareLink is below 7.0%, so your result is only a little above it. Your doctor can tell you what target is safest for you.";
+    if (/neuropath/.test(previousTopic)) return "Neuropathy means nerve damage. Diabetes can sometimes damage nerves, especially in the feet. This may feel like tingling, burning, pain, or numbness. Tell your doctor if you notice these symptoms.";
+    if (/metformin|medication|medicine/.test(previousTopic)) return "Metformin helps lower your blood sugar. Take it the way your doctor prescribed. If it upsets your stomach or causes another problem, speak with your doctor or pharmacist before changing it.";
+    return "Of course. Tell me which word, result, or part of my previous answer was unclear, and I’ll explain it using shorter, everyday language.";
+  }
 
   if (/chest pain|faint|seizure|can't breathe|cannot breathe|confusion|unconscious/.test(q)) return "If you are experiencing severe breathing difficulty, chest pain, confusion, fainting, seizures, or signs of extremely low or high blood sugar, seek urgent medical assistance immediately.";
   if (/exact diagnosis|what.*diagnos|condition.*mean/.test(q)) return "Your mock record lists Type 2 diabetes. This means the body does not use insulin effectively and may gradually make less insulin, causing blood glucose to rise. I cannot confirm an exact diagnosis; your doctor should confirm what applies to you and explain any test uncertainty.";
@@ -22,6 +37,5 @@ export async function sendMessageToLlama(message: string, _patientContext: unkno
   if (/blood pressure/.test(q)) return "Your latest mock blood pressure is 128/82 mmHg, close to the displayed care target. Blood pressure control is important because diabetes and high blood pressure together can increase heart and kidney risks. Your clinician can confirm your individual target.";
   if (/summary|clinical note|latest result|blood test/.test(q)) return "Your mock summary shows slightly improved glucose control, stable kidney measures, and blood pressure close to target. HbA1c remains just above the displayed target. Continue your prescribed plan and verify this AI-generated explanation with your care team.";
   if (/ask.*doctor|appointment/.test(q)) return "Consider asking: Is my HbA1c target right for me? Are my medicines still appropriate? Do I need a foot, eye, kidney, or nerve check? What symptoms should prompt an earlier review? What is the single most useful step before my next appointment?";
-  if (!/diabet|sugar|glucose|health|care|doctor|symptom|treatment|condition|body|risk/.test(q)) return "That question is outside the scope of this diabetes health assistant. I’m unable to provide advice or an answer for it.";
-  return `I understand you’re asking: “${message}” I can provide general diabetes education, but the current prototype does not generate open-ended clinical answers. Try including the specific result, symptom, medicine, or part of your care plan you want explained. For personal medical advice, please ask your healthcare professional.`;
+  return `I understand you’re asking: “${message}” This prototype is not connected to the full Llama model yet, so I may need a little more detail. I can still help explain it in relation to diabetes, kidney health, your results, medicines, symptoms, or care plan. What part would you like me to focus on?`;
 }

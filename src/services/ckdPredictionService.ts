@@ -1,0 +1,3 @@
+import type { CKDPredictionResult } from "@/src/types";
+// TODO: Replace with the validated CKD prediction API (for example, FastAPI). Never use this mock in clinical care.
+export async function predictCKDRisk(_patientInput:Record<string,string>):Promise<CKDPredictionResult>{await new Promise(r=>setTimeout(r,350));return{probability:14,category:"Low risk",explanation:"This mock result suggests a relatively low probability based on the information provided. It is not a diagnosis.",factors:["Kidney filtration is currently in a healthy range","Blood pressure is close to target","Diabetes duration requires continued monitoring"]};}

@@ -8,7 +8,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "DiabetesCare AI — Your health, made clearer",
+  title: "CareLink — Your health, made clearer",
   description: "A calm, patient-friendly diabetes health companion.",
   icons: {
     icon: "/favicon.svg",

@@ -1,41 +1,41 @@
-// TODO: Connect to the approved Llama API. Patient context must never be exposed without consent.
-// Until then, this topic router provides varied, transparent mock responses.
-type AssistantContext = {
-  conversation?: Array<{ role: "user" | "assistant"; content: string }>;
+type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
 };
 
-export async function sendMessageToLlama(message: string, patientContext: unknown): Promise<string> {
-  await new Promise((resolve) => setTimeout(resolve, 650));
-  const q = message.toLowerCase().trim();
-  const context = patientContext as AssistantContext;
-  const previousMessages = context.conversation?.slice(0, -1) ?? [];
-  const previousTopic = previousMessages.map((item) => item.content.toLowerCase()).join(" ");
+type PatientContext = {
+  conversation?: ConversationMessage[];
+};
 
-  if (/simpler|simple way|plain language|don't understand|do not understand|what does that mean|explain that/.test(q)) {
-    if (/nephropath/.test(previousTopic)) return "Nephropathy means kidney damage. Diabetes can slowly damage the tiny filters inside your kidneys. When those filters are damaged, the kidneys may not clean your blood as well as they should. Doctors use blood and urine tests to check for this. Your CareLink percentage only estimates risk—it does not mean you have kidney damage.";
-    if (/hba1c/.test(previousTopic)) return "HbA1c is a number that shows your average blood sugar during the last two to three months. Your result is 7.1%. The target shown in CareLink is below 7.0%, so your result is only a little above it. Your doctor can tell you what target is safest for you.";
-    if (/neuropath/.test(previousTopic)) return "Neuropathy means nerve damage. Diabetes can sometimes damage nerves, especially in the feet. This may feel like tingling, burning, pain, or numbness. Tell your doctor if you notice these symptoms.";
-    if (/metformin|medication|medicine/.test(previousTopic)) return "Metformin helps lower your blood sugar. Take it the way your doctor prescribed. If it upsets your stomach or causes another problem, speak with your doctor or pharmacist before changing it.";
-    return "Of course. Tell me which word, result, or part of my previous answer was unclear, and I’ll explain it using shorter, everyday language.";
+type ChatApiResponse = {
+  answer?: string;
+  error?: string;
+  model?: string;
+};
+
+/**
+ * Sends conversation text to CareLink's server route. The Groq API key remains
+ * server-side and is never exposed to this browser service.
+ */
+export async function sendMessageToLlama(
+  message: string,
+  patientContext: PatientContext,
+): Promise<string> {
+  const existingConversation = patientContext.conversation ?? [];
+  const messages: ConversationMessage[] = existingConversation.length
+    ? existingConversation.map(({ role, content }) => ({ role, content }))
+    : [{ role: "user", content: message }];
+
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
+  });
+
+  const data = (await response.json()) as ChatApiResponse;
+  if (!response.ok || !data.answer) {
+    throw new Error(data.error ?? "The health assistant could not respond.");
   }
 
-  if (/chest pain|faint|seizure|can't breathe|cannot breathe|confusion|unconscious/.test(q)) return "If you are experiencing severe breathing difficulty, chest pain, confusion, fainting, seizures, or signs of extremely low or high blood sugar, seek urgent medical assistance immediately.";
-  if (/exact diagnosis|what.*diagnos|condition.*mean/.test(q)) return "Your mock record lists Type 2 diabetes. This means the body does not use insulin effectively and may gradually make less insulin, causing blood glucose to rise. I cannot confirm an exact diagnosis; your doctor should confirm what applies to you and explain any test uncertainty.";
-  if (/what caused|possible cause|why.*condition/.test(q)) return "Type 2 diabetes usually develops through a combination of insulin resistance, genetics, age, and environmental or lifestyle factors. It is rarely caused by one action or food. Other conditions or medicines can also affect glucose, so your doctor may consider alternatives based on your full history.";
-  if (/contagious|other parts|spread/.test(q)) return "Diabetes is not contagious and cannot spread between people. Over time, persistently high glucose may affect the nerves, eyes, kidneys, heart, blood vessels, and feet. Regular monitoring helps identify changes early.";
-  if (/long-term|outlook|complication/.test(q)) return "Many people live well with Type 2 diabetes for decades. The outlook varies with glucose, blood pressure, cholesterol, smoking, medicines, and other health factors. Possible complications include nerve, eye, kidney, heart, circulation, and foot problems, but good ongoing care can lower risk.";
-  if (/treatment option|pros and cons/.test(q)) return "Treatment may include food and activity changes, metformin, other glucose-lowering medicines, or insulin. Each option differs in glucose effect, side effects, cost, dosing, and benefits for the heart or kidneys. Your doctor should compare these using your results and preferences; do not change medication on this mock advice.";
-  if (/side effect|manage them/.test(q)) return "Metformin commonly causes nausea, diarrhoea, or stomach discomfort, especially when starting. Taking it with food may help if your prescriber agrees. Seek professional advice for persistent symptoms, severe weakness, breathing difficulty, dehydration, or another concerning reaction; do not stop it without speaking to your clinician.";
-  if (/hba1c/.test(q)) return "Your HbA1c of 7.1% estimates your average blood sugar over the past two to three months. It is just above the target displayed in your record and has improved from 7.5%. Ask your doctor whether below 7.0% is the right personal target for you.";
-  if (/nephropath/.test(q)) return "Diabetic nephropathy means kidney damage related to diabetes. Over time, high blood glucose and blood pressure can damage the kidneys’ filtering system, sometimes allowing protein called albumin to leak into the urine. It is commonly monitored using eGFR, creatinine, and a urine albumin-to-creatinine ratio. The nephropathy percentage shown in CareLink is a Random Forest risk estimate—not a diagnosis—and should be reviewed with your doctor.";
-  if (/neuropath|numb|tingl|burning|nerve|feet|foot/.test(q)) return "Diabetic neuropathy is nerve damage associated with diabetes. It may cause tingling, burning, numbness, pain, or reduced feeling, often in the feet. A risk estimate cannot diagnose it. Report new symptoms or wounds promptly and ask for a professional foot and nerve examination.";
-  if (/kidney|egfr|creatinine/.test(q)) return "Your latest eGFR of 82 and creatinine of 78 µmol/L are within the ranges shown in your mock record, suggesting stable kidney filtration. Trends and urine testing also matter, so review the results with your healthcare professional.";
-  if (/low blood sugar|hypogly|shak|sweat|dizz/.test(q)) return "Low blood sugar may cause shaking, sweating, hunger, dizziness, palpitations, confusion, or weakness. Follow the hypo plan given by your care team. Severe confusion, a seizure, fainting, or inability to swallow requires urgent medical assistance.";
-  if (/food|diet|eat|carb|drink/.test(q)) return "Carbohydrate portions, sugary drinks, and refined foods can raise blood glucose. Balanced meals containing vegetables, fibre, protein, and suitable carbohydrate portions may help. A dietitian can tailor advice to your culture, medicines, and preferences.";
-  if (/exercise|activity|walk/.test(q)) return "Regular activity can improve insulin sensitivity and glucose control. The appropriate type and intensity depend on your fitness, medicines, feet, heart health, and glucose pattern. Ask your care team about a safe starting plan and how to prevent low blood sugar.";
-  if (/metformin|medication|medicine|tablet|insulin/.test(q)) return "Your mock record lists Metformin 500 mg twice daily. It helps lower glucose production by the liver and improves insulin sensitivity. Take it only as prescribed and speak with your doctor or pharmacist before changing the dose or schedule.";
-  if (/blood pressure/.test(q)) return "Your latest mock blood pressure is 128/82 mmHg, close to the displayed care target. Blood pressure control is important because diabetes and high blood pressure together can increase heart and kidney risks. Your clinician can confirm your individual target.";
-  if (/summary|clinical note|latest result|blood test/.test(q)) return "Your mock summary shows slightly improved glucose control, stable kidney measures, and blood pressure close to target. HbA1c remains just above the displayed target. Continue your prescribed plan and verify this AI-generated explanation with your care team.";
-  if (/ask.*doctor|appointment/.test(q)) return "Consider asking: Is my HbA1c target right for me? Are my medicines still appropriate? Do I need a foot, eye, kidney, or nerve check? What symptoms should prompt an earlier review? What is the single most useful step before my next appointment?";
-  return `I understand you’re asking: “${message}” This prototype is not connected to the full Llama model yet, so I may need a little more detail. I can still help explain it in relation to diabetes, kidney health, your results, medicines, symptoms, or care plan. What part would you like me to focus on?`;
+  return data.answer;
 }

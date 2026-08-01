@@ -54,6 +54,7 @@ import { predictNeuropathyRisk } from "@/src/services/randomForestNeuropathyServ
 import { sendMessageToLlama } from "@/src/services/llamaService";
 import type { ChatMessage, Page } from "@/src/types";
 import { KidneysIcon } from "@/src/components/KidneysIcon";
+import { NeuropathyIcon } from "@/src/components/NeuropathyIcon";
 import { applyLanguage, type Language } from "@/src/i18n/malay";
 
 const nav = [
@@ -763,7 +764,7 @@ function RiskCard({
   kind: "nephropathy" | "neuropathy";
   result: RiskResult;
 }) {
-  const Icon = kind === "nephropathy" ? KidneysIcon : HeartPulse;
+  const Icon = kind === "nephropathy" ? KidneysIcon : NeuropathyIcon;
   const recommendation =
     kind === "nephropathy"
       ? "Discuss this estimate and your kidney test trends with your doctor."

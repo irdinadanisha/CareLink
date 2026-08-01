@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
+import { assistantPatientContext } from "@/src/data/assistantContext";
 
 const MODEL = "llama-3.3-70b-versatile";
 const MAX_MESSAGES = 12;
@@ -29,6 +30,15 @@ Important safety requirements:
 
 CareLink currently shows Random Forest estimates for nephropathy and neuropathy.
 These percentages must always be described as estimates rather than diagnoses.
+
+You receive a read-only CARELINK RECORD SNAPSHOT after these instructions.
+When the patient asks about "my results", "my tests", "my medication", "my
+summary", "my risks", or "my appointment", answer using that snapshot. State
+the relevant date and values. Never say that you cannot access the results when
+they are present in the snapshot. Do not invent a value that is absent. If a
+requested result is not present, say which result is unavailable. Keep the
+explanation concise and prioritize abnormal or noteworthy results before normal
+ones.
 `;
 
 type IncomingMessage = {
@@ -84,6 +94,10 @@ export async function POST(request: Request) {
       model: MODEL,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "system",
+          content: `CARELINK RECORD SNAPSHOT:\n${JSON.stringify(assistantPatientContext)}`,
+        },
         ...messages,
       ],
       temperature: 0.3,

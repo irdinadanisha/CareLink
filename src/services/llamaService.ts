@@ -6,6 +6,7 @@ type ConversationMessage = {
 type PatientContext = {
   conversation?: ConversationMessage[];
   language?: "en" | "ms";
+  accessToken?: string;
 };
 
 type ChatApiResponse = {
@@ -15,8 +16,8 @@ type ChatApiResponse = {
 };
 
 /**
- * Sends conversation text to CareLink's server route. The Groq API key remains
- * server-side and is never exposed to this browser service.
+ * Sends conversation text to CareLink's server route. API credentials and the
+ * authenticated patient-record lookup remain on the server.
  */
 export async function sendMessageToLlama(
   message: string,
@@ -29,8 +30,14 @@ export async function sendMessageToLlama(
 
   const response = await fetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, language: patientContext.language ?? "en" }),
+    headers: {
+      "Content-Type": "application/json",
+      ...(patientContext.accessToken ? { Authorization: `Bearer ${patientContext.accessToken}` } : {}),
+    },
+    body: JSON.stringify({
+      messages,
+      language: patientContext.language ?? "en",
+    }),
   });
 
   const data = (await response.json()) as ChatApiResponse;

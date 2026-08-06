@@ -309,6 +309,48 @@ Object.assign(ms, {
   "Tukar ke Bahasa Melayu": "Tukar kepada Bahasa Melayu",
 });
 
+Object.assign(ms, {
+  "Wound Health Check": "Pemeriksaan Kesihatan Luka",
+  "SKIN & WOUND MONITORING": "PEMANTAUAN KULIT DAN LUKA",
+  "Record warning signs around a wound or affected skin area and save a photograph for your care history.": "Rekod tanda amaran di sekitar luka atau kawasan kulit yang terjejas dan simpan gambar dalam sejarah penjagaan anda.",
+  "Is the wound or surrounding skin redder than usual?": "Adakah luka atau kulit di sekitarnya lebih merah daripada biasa?",
+  "Is there new swelling around the wound or affected area?": "Adakah terdapat bengkak baharu di sekitar luka atau kawasan yang terjejas?",
+  "Does the area feel unusually warm?": "Adakah kawasan tersebut terasa lebih panas daripada biasa?",
+  "Look for new redness, spreading redness, or a noticeable change from your usual skin colour.": "Perhatikan kemerahan baharu, kemerahan yang merebak atau perubahan ketara daripada warna kulit biasa anda.",
+  "Look for new puffiness, tight-looking skin, or a clear difference from the surrounding area.": "Perhatikan bengkak baharu, kulit yang kelihatan tegang atau perbezaan jelas daripada kawasan sekeliling.",
+  "Compare it gently with nearby unaffected skin or the same area on the other side of your body. A photo cannot measure warmth.": "Bandingkan secara perlahan dengan kulit berdekatan yang tidak terjejas atau kawasan yang sama pada sebelah badan yang lain. Gambar tidak dapat mengukur suhu.",
+  "Use good lighting and show the wound or affected area together with some surrounding skin. JPEG, PNG, or WebP; maximum 8 MB.": "Gunakan pencahayaan yang baik dan tunjukkan luka atau kawasan terjejas bersama sedikit kulit di sekelilingnya. JPEG, PNG atau WebP; maksimum 8 MB.",
+  "Save wound health check": "Simpan pemeriksaan kesihatan luka",
+  "No wound health checks saved yet.": "Belum ada pemeriksaan kesihatan luka yang disimpan.",
+  "Keep a close eye on the affected area": "Pantau kawasan yang terjejas dengan teliti",
+  "Foot Health Check": "Pemeriksaan Kesihatan Kaki",
+  "NEUROPATHY SUPPORT": "SOKONGAN NEUROPATI",
+  "Record visible or felt warning signs and save a photograph for your care history.": "Rekod tanda amaran yang dilihat atau dirasai dan simpan gambar dalam sejarah penjagaan anda.",
+  "Check for warning signs": "Periksa tanda amaran",
+  "Answer all three questions before adding a photograph.": "Jawab ketiga-tiga soalan sebelum menambah gambar.",
+  "Does your foot look red?": "Adakah kaki anda kelihatan kemerahan?",
+  "Does your foot look swollen?": "Adakah kaki anda kelihatan bengkak?",
+  "Does your foot feel unusually warm?": "Adakah kaki anda terasa lebih panas daripada biasa?",
+  "Look for new or spreading redness compared with your usual skin colour.": "Perhatikan kemerahan baharu atau yang merebak berbanding warna kulit biasa anda.",
+  "Compare both feet and look for new puffiness or tight-looking skin.": "Bandingkan kedua-dua kaki dan perhatikan bengkak baharu atau kulit yang kelihatan tegang.",
+  "Compare it gently with the other foot. A photo cannot measure warmth.": "Bandingkan dengan kaki sebelah secara perlahan. Gambar tidak dapat mengukur suhu.",
+  Yes: "Ya", No: "Tidak",
+  "Add a current photograph": "Tambah gambar terkini",
+  "Use good lighting and show the whole affected foot. JPEG, PNG, or WebP; maximum 8 MB.": "Gunakan pencahayaan yang baik dan tunjukkan keseluruhan kaki yang terjejas. JPEG, PNG atau WebP; maksimum 8 MB.",
+  "Use camera": "Gunakan kamera", "Upload image": "Muat naik gambar",
+  "LIVE CAMERA": "KAMERA LANGSUNG",
+  "Take a current photograph": "Ambil gambar semasa",
+  "Close camera": "Tutup kamera",
+  "Use good lighting and keep the wound or affected area clearly visible.": "Gunakan pencahayaan yang baik dan pastikan luka atau kawasan terjejas dapat dilihat dengan jelas.",
+  Cancel: "Batal",
+  "Capture photograph": "Ambil gambar",
+  "Save foot health check": "Simpan pemeriksaan kaki", "Saving securely…": "Sedang disimpan dengan selamat…",
+  "YOUR RECORDS": "REKOD ANDA", "Previous checks": "Pemeriksaan terdahulu", "No foot health checks saved yet.": "Belum ada pemeriksaan kesihatan kaki yang disimpan.",
+  "Doctor’s attention advised": "Pemeriksaan doktor disyorkan", "Continue monitoring": "Teruskan pemantauan",
+  "This needs a doctor’s attention": "Keadaan ini memerlukan perhatian doktor", "Keep a close eye on your foot": "Pantau kaki anda dengan teliti", "No warning signs reported": "Tiada tanda amaran dilaporkan",
+  "Done": "Selesai",
+});
+
 export function translateToMalay(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return value;

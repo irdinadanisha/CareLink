@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Bell,
   Bot,
+  Camera,
   CalendarDays,
-  ChevronDown,
   ClipboardList,
   Droplets,
   Eye,
@@ -27,6 +27,7 @@ import {
   Stethoscope,
   TestTube2,
   Trash2,
+  Upload,
   User,
   X,
 } from "lucide-react";
@@ -40,14 +41,7 @@ import {
   YAxis,
 } from "recharts";
 import {
-  appointments,
-  bloodTests,
-  clinicalSummary,
   healthMetrics,
-  nephropathyModelInput,
-  neuropathyModelInput,
-  patient,
-  trendData,
 } from "@/src/data/mockData";
 import { predictNephropathyRisk } from "@/src/services/randomForestNephropathyService";
 import { predictNeuropathyRisk } from "@/src/services/randomForestNeuropathyService";
@@ -56,6 +50,21 @@ import type { ChatMessage, Page } from "@/src/types";
 import { KidneysIcon } from "@/src/components/KidneysIcon";
 import { NeuropathyIcon } from "@/src/components/NeuropathyIcon";
 import { applyLanguage, type Language } from "@/src/i18n/malay";
+import {
+  restorePatientSession,
+  signInPatient,
+  signOutPatient,
+} from "@/src/services/patientDataService";
+import type { CareLinkPatientData } from "@/src/types";
+import { listFootChecks, saveFootCheck, type FootCheckRecord } from "@/src/services/footCheckService";
+
+const initials = (name: string) =>
+  name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+
+const displayDate = (date: string) =>
+  new Intl.DateTimeFormat("en-MY", { day: "2-digit", month: "short", year: "numeric" }).format(
+    new Date(`${date}T00:00:00`),
+  );
 
 const nav = [
   { id: "dashboard", label: "Home", icon: Home },
@@ -63,6 +72,7 @@ const nav = [
   { id: "assistant", label: "AI Assistant", icon: MessageCircle },
   { id: "ckd", label: "Possible Risks", icon: ShieldCheck },
   { id: "results", label: "Test Results", icon: TestTube2 },
+  { id: "footcheck", label: "Wound Health Check", icon: Camera },
   { id: "profile", label: "Profile", icon: User },
 ] as const;
 
@@ -116,11 +126,13 @@ function Header({
   onMenu,
   language,
   onLanguageChange,
+  patientName,
 }: {
   title: string;
   onMenu: () => void;
   language: Language;
   onLanguageChange: () => void;
+  patientName: string;
 }) {
   return (
     <header className="topbar">
@@ -150,14 +162,18 @@ function Header({
           <Bell size={21} />
           <i />
         </button>
-        <div className="avatar">SA</div>
+        <div className="avatar">{initials(patientName)}</div>
       </div>
     </header>
   );
 }
 
-function Login({ onLogin }: { onLogin: () => void }) {
+function Login({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
   const [show, setShow] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   return (
     <main className="login-page">
       <section className="login-side">
@@ -194,9 +210,12 @@ function Login({ onLogin }: { onLogin: () => void }) {
         </div>
         <form
           className="login-card"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            onLogin();
+            setSubmitting(true); setError("");
+            try { await onLogin(email, password); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : "Sign in failed."); }
+            finally { setSubmitting(false); }
           }}
         >
           <div>
@@ -207,8 +226,9 @@ function Login({ onLogin }: { onLogin: () => void }) {
           <label>
             Email or patient ID
             <input
-              defaultValue="sarah.ahmad@example.com"
-              type="text"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
               autoComplete="username"
             />
           </label>
@@ -216,7 +236,8 @@ function Login({ onLogin }: { onLogin: () => void }) {
             Password
             <div className="password">
               <input
-                defaultValue="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 type={show ? "text" : "password"}
                 autoComplete="current-password"
               />
@@ -237,8 +258,9 @@ function Login({ onLogin }: { onLogin: () => void }) {
               Forgot password?
             </button>
           </div>
-          <button className="primary wide" type="submit">
-            Sign in securely
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="primary wide" type="submit" disabled={submitting}>
+            {submitting ? "Signing in…" : "Sign in securely"}
           </button>
           <p className="support">
             Need help?{" "}
@@ -252,7 +274,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
   );
 }
 
-function Dashboard({ go }: { go: (p: Page) => void }) {
+function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientData }) {
   const [nephropathyRisk, setNephropathyRisk] = useState<Awaited<
     ReturnType<typeof predictNephropathyRisk>
   > | null>(null);
@@ -262,8 +284,8 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
   useEffect(() => {
     let active = true;
     Promise.all([
-      predictNephropathyRisk(nephropathyModelInput),
-      predictNeuropathyRisk(neuropathyModelInput),
+      predictNephropathyRisk(data.nephropathyInput),
+      predictNeuropathyRisk(data.neuropathyInput),
     ])
       .then(([nephropathy, neuropathy]) => {
         if (active) {
@@ -275,29 +297,44 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
     return () => {
       active = false;
     };
-  }, []);
-  const metrics = healthMetrics.map((metric) =>
-    metric.name === "Nephropathy risk" && nephropathyRisk
+  }, [data.nephropathyInput, data.neuropathyInput]);
+  const hba1c = data.record.bloodTests.find((test) => test.name === "HbA1c");
+  const fasting = data.record.bloodTests.find((test) => test.name === "Fasting blood glucose");
+  const recordDate = displayDate(data.recordDate);
+  const hba1cNumber = Number(hba1c?.value ?? 0);
+  const overallStatus = hba1cNumber >= 9 ? "Needs prompt review" : hba1cNumber > 7 ? "Needs attention" : "Stable";
+  const overallMessage = hba1cNumber >= 9
+    ? "Your latest glucose results are well above target. Please follow up with your care team."
+    : hba1cNumber > 7
+      ? "Some results are above target. Keep following your care plan and discuss them at review."
+      : "Your latest glucose result is within its usual target range. Keep following your care plan.";
+  const metrics = healthMetrics.map((metric) => {
+    const base = { ...metric, date: recordDate };
+    if (metric.name === "HbA1c" && hba1c) return { ...base, value: `${hba1c.value}${hba1c.unit}`, status: hba1c.status };
+    if (metric.name === "Fasting glucose" && fasting) return { ...base, value: `${fasting.value} ${fasting.unit}`, status: fasting.status };
+    if (metric.name === "Blood pressure") return { ...base, value: data.record.bloodPressure };
+    if (metric.name === "Kidney function") return { ...base, value: `${data.record.kidneyFunction} eGFR`, status: data.record.kidneyFunction > 60 ? "Good" : "Needs attention" };
+    return metric.name === "Nephropathy risk" && nephropathyRisk
       ? {
-          ...metric,
+          ...base,
           value: `${nephropathyRisk.probability}%`,
           status: nephropathyRisk.category,
         }
       : metric.name === "Neuropathy risk" && neuropathyRisk
         ? {
-            ...metric,
+          ...base,
             value: `${neuropathyRisk.probability}%`,
             status: neuropathyRisk.category,
           }
-        : metric,
-  );
+        : base;
+  });
   return (
     <>
       <section className="welcome">
         <div>
           <p className="eyebrow">SATURDAY, 1 AUGUST 2026</p>
           <h2>
-            Good morning, Sarah <span>👋</span>
+            Good morning, {data.profile.fullName.split(" ")[0]} <span>👋</span>
           </h2>
           <p>Here’s a clear look at how you’re doing today.</p>
         </div>
@@ -311,13 +348,10 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
         </span>
         <div>
           <p className="eyebrow">YOUR HEALTH AT A GLANCE</p>
-          <h3>Your condition is currently stable.</h3>
-          <p>
-            Your latest results are within your usual range. Keep following your
-            medication and care plan.
-          </p>
+          <h3>Your condition currently {overallStatus === "Stable" ? "appears stable" : "needs attention"}.</h3>
+          <p>{overallMessage}</p>
         </div>
-        <StatusBadge status="Stable" />
+        <StatusBadge status={overallStatus} />
       </section>
       <Notice>
         This summary is for informational purposes and does not replace advice
@@ -363,14 +397,8 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
               <ClipboardList />
             </span>
           </div>
-          <blockquote>
-            “Your blood sugar control has improved slightly since your previous
-            appointment. Your kidney function is currently stable.”
-          </blockquote>
-          <p>
-            Continue taking your prescribed medication and be mindful of
-            carbohydrate portions.
-          </p>
+          <blockquote>“{data.record.clinicalSummary.sections[0]?.text}”</blockquote>
+          <p>{data.record.clinicalSummary.sections[1]?.text}</p>
           <div className="button-row">
             <button className="primary" onClick={() => go("summary")}>
               View full summary
@@ -388,7 +416,7 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
             </div>
             <StatusBadge status="Improving" />
           </div>
-          <TrendChart />
+          <TrendChart data={data.record.trendData} />
           <p className="chart-foot">
             <span /> Your latest reading is 0.4% lower than February.
           </p>
@@ -409,7 +437,7 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
             {
               icon: Pill,
               title: "Take your medication",
-              text: "Metformin 500 mg · Twice daily",
+              text: data.record.medication,
               done: true,
             },
             {
@@ -449,8 +477,8 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
         </span>
         <div>
           <p className="eyebrow">UPCOMING APPOINTMENT</p>
-          <h3>{appointments[0].type}</h3>
-          <p>{appointments[0].doctor} · Diabetes Clinic</p>
+          <h3>{data.record.appointments[0]?.type}</h3>
+          <p>{data.record.appointments[0]?.doctor} · Diabetes Clinic</p>
         </div>
         <div className="appointment-date">
           <strong>20</strong>
@@ -462,7 +490,7 @@ function Dashboard({ go }: { go: (p: Page) => void }) {
   );
 }
 
-function TrendChart({ data = trendData }: { data?: typeof trendData }) {
+function TrendChart({ data }: { data: { month: string; value: number }[] }) {
   return (
     <div className="chart">
       <ResponsiveContainer width="100%" height="100%">
@@ -511,16 +539,16 @@ function TrendChart({ data = trendData }: { data?: typeof trendData }) {
   );
 }
 
-function SummaryPage({ go }: { go: (p: Page) => void }) {
+function SummaryPage({ go, data }: { go: (p: Page) => void; data: CareLinkPatientData }) {
   const [original, setOriginal] = useState(false);
   return (
     <>
       <div className="page-intro">
         <div>
-          <p className="eyebrow">LAST UPDATED 28 JULY 2026</p>
+          <p className="eyebrow">LAST UPDATED {displayDate(data.recordDate).toUpperCase()}</p>
           <h2>Your Clinical Notes, Explained Simply</h2>
           <p>
-            A patient-friendly explanation of your latest visit with Dr. Lim.
+            A patient-friendly explanation of your latest visit with {data.record.appointments[0]?.doctor}.
           </p>
         </div>
         <button className="secondary" onClick={() => setOriginal(!original)}>
@@ -535,16 +563,12 @@ function SummaryPage({ go }: { go: (p: Page) => void }) {
       {original && (
         <article className="card original">
           <p className="eyebrow">ORIGINAL CLINICAL NOTES</p>
-          <p>
-            54F, T2DM x9y. Glycaemic control improving; HbA1c 7.1% (prev 7.5%).
-            BP controlled. Renal profile stable, eGFR 82. Continue metformin
-            500mg BD. Counselled diet/exercise. Repeat FBC, RP, HbA1c in 3/12.
-          </p>
+          <p>{data.record.clinicalSummary.sections.map((section) => section.text).join(" ")}</p>
         </article>
       )}
       <div className="summary-layout">
         <div className="summary-sections">
-          {clinicalSummary.sections.map((s, i) => (
+          {data.record.clinicalSummary.sections.map((s, i) => (
             <article className="card summary-section" key={s.title}>
               <span className={`number n${i}`}>{i + 1}</span>
               <div>
@@ -577,7 +601,7 @@ function SummaryPage({ go }: { go: (p: Page) => void }) {
           </article>
           <article className="card care-contact">
             <p className="eyebrow">YOUR CARE TEAM</p>
-            <h3>Dr. Michelle Lim</h3>
+            <h3>{data.record.appointments[0]?.doctor}</h3>
             <p>Diabetes Clinic · Klinik Kesihatan</p>
             <button className="link">View clinic details →</button>
           </article>
@@ -601,13 +625,12 @@ const starters = [
   "What are my treatment options, and what are the pros and cons?",
   "What are the possible side effects, and how can I manage them?",
 ];
-function AssistantPage({ language }: { language: Language }) {
+function AssistantPage({ language, data, accessToken }: { language: Language; data: CareLinkPatientData; accessToken: string }) {
   const initial: ChatMessage[] = [
     {
       id: "1",
       role: "assistant",
-      content:
-        "Hello Sarah — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?",
+      content: `Hello ${data.profile.fullName.split(" ")[0]} — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?`,
       time: "9:41 AM",
     },
   ];
@@ -627,7 +650,7 @@ function AssistantPage({ language }: { language: Language }) {
     setText("");
     setTyping(true);
     try {
-      const reply = await sendMessageToLlama(value, { conversation, language });
+      const reply = await sendMessageToLlama(value, { conversation, language, accessToken });
       setMessages((m) => [
         ...m,
         {
@@ -759,10 +782,12 @@ function RiskCard({
   title,
   kind,
   result,
+  recordDate,
 }: {
   title: string;
   kind: "nephropathy" | "neuropathy";
   result: RiskResult;
+  recordDate: string;
 }) {
   const Icon = kind === "nephropathy" ? KidneysIcon : NeuropathyIcon;
   const recommendation =
@@ -829,7 +854,7 @@ function RiskCard({
       <p>
         {recommendation} Do not change medication or care based on this result.
       </p>
-      <time>Blood test record · 28 July 2026</time>
+      <time>Blood test record · {displayDate(recordDate)}</time>
       <div className="model-performance">
         <span>
           Model test accuracy <b>{(result.modelAccuracy * 100).toFixed(2)}%</b>
@@ -842,7 +867,7 @@ function RiskCard({
   );
 }
 
-function PossibleRisksPage() {
+function PossibleRisksPage({ data }: { data: CareLinkPatientData }) {
   const [nephropathy, setNephropathy] = useState<RiskResult | null>(null);
   const [neuropathy, setNeuropathy] = useState<Awaited<
     ReturnType<typeof predictNeuropathyRisk>
@@ -851,8 +876,8 @@ function PossibleRisksPage() {
   useEffect(() => {
     let active = true;
     Promise.all([
-      predictNephropathyRisk(nephropathyModelInput),
-      predictNeuropathyRisk(neuropathyModelInput),
+      predictNephropathyRisk(data.nephropathyInput),
+      predictNeuropathyRisk(data.neuropathyInput),
     ])
       .then(([neph, neuro]) => {
         if (active) {
@@ -869,7 +894,7 @@ function PossibleRisksPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [data.nephropathyInput, data.neuropathyInput]);
   return (
     <>
       <div className="page-intro">
@@ -911,11 +936,13 @@ function PossibleRisksPage() {
             title="Nephropathy risk"
             kind="nephropathy"
             result={nephropathy}
+            recordDate={data.recordDate}
           />
           <RiskCard
             title="Neuropathy risk"
             kind="neuropathy"
             result={neuropathy}
+            recordDate={data.recordDate}
           />
         </div>
       )}
@@ -923,7 +950,8 @@ function PossibleRisksPage() {
   );
 }
 
-function ResultsPage() {
+function ResultsPage({ data }: { data: CareLinkPatientData }) {
+  const bloodTests = data.record.bloodTests;
   const [filter, setFilter] = useState("Latest results"),
     [selected, setSelected] = useState(bloodTests[0]);
   const visible = bloodTests.filter((t) =>
@@ -939,7 +967,7 @@ function ResultsPage() {
     <>
       <div className="page-intro">
         <div>
-          <p className="eyebrow">LATEST PANEL · 28 JULY 2026</p>
+          <p className="eyebrow">LATEST PANEL · {displayDate(data.recordDate).toUpperCase()}</p>
           <h2>Blood Test Results</h2>
           <p>Your lab results, explained in patient-friendly language.</p>
         </div>
@@ -1004,7 +1032,7 @@ function ResultsPage() {
           <StatusBadge status={selected.status} />
           <p>{selected.explanation}</p>
           <div className="mini-chart">
-            <TrendChart data={selected.trend} />
+            <TrendChart data={selected.trend.map((value, index) => typeof value === "number" ? ({ month: ["Feb", "May"][index], value }) : value)} />
           </div>
           <Notice>
             One result alone does not tell the full story. Your doctor will
@@ -1016,17 +1044,168 @@ function ResultsPage() {
   );
 }
 
+type FootAnswers = { redness: boolean | null; swelling: boolean | null; warmth: boolean | null };
+
+function FootHealthPage({ userId }: { userId: string }) {
+  const [answers, setAnswers] = useState<FootAnswers>({ redness: null, swelling: null, warmth: null });
+  const [image, setImage] = useState<File | null>(null);
+  const [history, setHistory] = useState<FootCheckRecord[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const [result, setResult] = useState<{ symptomCount: number; recommendation: "monitor" | "doctor_attention" } | null>(null);
+  const answered = Object.values(answers).every((value) => value !== null);
+  const preview = useMemo(() => image ? URL.createObjectURL(image) : "", [image]);
+
+  useEffect(() => {
+    listFootChecks().then(setHistory).catch(() => {});
+  }, []);
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => {
+    if (!cameraOpen) return;
+    let cancelled = false;
+    const openCamera = async () => {
+      setCameraError("");
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        setCameraError("Live camera access requires HTTPS, or CareLink must be opened as localhost on this device.");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        cameraStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch (cause) {
+        setCameraError(
+          cause instanceof DOMException && cause.name === "NotAllowedError"
+            ? "Camera permission was denied. Allow camera access in your browser settings and try again."
+            : "CareLink could not start this device’s camera. Check that a camera is connected and available.",
+        );
+      }
+    };
+    void openCamera();
+    return () => {
+      cancelled = true;
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    };
+  }, [cameraOpen]);
+
+  const chooseImage = (file?: File) => {
+    setError("");
+    if (file) setImage(file);
+  };
+  const captureImage = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setCameraError("The camera is still starting. Wait a moment and try again.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setCameraError("CareLink could not capture the photograph. Please try again.");
+        return;
+      }
+      chooseImage(new File([blob], `wound-camera-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      setCameraOpen(false);
+    }, "image/jpeg", 0.9);
+  };
+  const submit = async () => {
+    if (!answered || !image) return;
+    setSubmitting(true); setError("");
+    try {
+      const saved = await saveFootCheck(userId, answers as Record<keyof FootAnswers, boolean>, image);
+      setResult(saved);
+      setHistory(await listFootChecks());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The wound check could not be saved.");
+    } finally { setSubmitting(false); }
+  };
+  const reset = () => {
+    setAnswers({ redness: null, swelling: null, warmth: null });
+    setImage(null); setResult(null); setError("");
+  };
+  const questions: { key: keyof FootAnswers; title: string; hint: string }[] = [
+    { key: "redness", title: "Is the wound or surrounding skin redder than usual?", hint: "Look for new redness, spreading redness, or a noticeable change from your usual skin colour." },
+    { key: "swelling", title: "Is there new swelling around the wound or affected area?", hint: "Look for new puffiness, tight-looking skin, or a clear difference from the surrounding area." },
+    { key: "warmth", title: "Does the area feel unusually warm?", hint: "Compare it gently with nearby unaffected skin or the same area on the other side of your body. A photo cannot measure warmth." },
+  ];
+  return <>
+    <div className="page-intro"><div><p className="eyebrow">SKIN & WOUND MONITORING</p><h2>Wound Health Check</h2><p>Record warning signs around a wound or affected skin area and save a photograph for your care history.</p></div></div>
+    <Notice kind="warning">This checklist does not analyse or diagnose the photograph. If you have an open wound, pus, fever, black or blue skin, rapidly spreading redness, or severe swelling, seek urgent medical help.</Notice>
+    <div className="foot-check-layout">
+      <section className="card foot-check-form">
+        <div className="foot-step"><span>1</span><div><h3>Check for warning signs</h3><p>Answer all three questions before adding a photograph.</p></div></div>
+        <div className="foot-questions">
+          {questions.map((question) => <article key={question.key} className="foot-question">
+            <div><h4>{question.title}</h4><p>{question.hint}</p></div>
+            <div className="yes-no" role="group" aria-label={question.title}>
+              {[false, true].map((value) => <button key={String(value)} className={answers[question.key] === value ? "selected" : ""} onClick={() => setAnswers((current) => ({ ...current, [question.key]: value }))}>{value ? "Yes" : "No"}</button>)}
+            </div>
+          </article>)}
+        </div>
+        {answered && <>
+          <div className="foot-step second"><span>2</span><div><h3>Add a current photograph</h3><p>Use good lighting and show the wound or affected area together with some surrounding skin. JPEG, PNG, or WebP; maximum 8 MB.</p></div></div>
+          <div className="image-actions">
+            <button type="button" className="primary" onClick={() => setCameraOpen(true)}><Camera size={18} /> Use camera</button>
+            <label className="secondary"><Upload size={18} /> Upload image<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => chooseImage(event.target.files?.[0])} /></label>
+          </div>
+          {preview && <div className="foot-preview"><img src={preview} alt="Selected wound check" /><span>{image?.name}</span></div>}
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="primary wide save-foot-check" disabled={!image || submitting} onClick={submit}>{submitting ? "Saving securely…" : "Save wound health check"}</button>
+        </>}
+      </section>
+      <aside className="card foot-history">
+        <p className="eyebrow">YOUR RECORDS</p><h3>Previous checks</h3>
+        {history.length === 0 ? <p>No wound health checks saved yet.</p> : history.map((check) => <article key={check.id}>
+          {check.imageUrl && <img src={check.imageUrl} alt="Previously uploaded wound check" />}
+          <div><strong>{check.symptomCount}/3 signs reported</strong><small>{new Intl.DateTimeFormat("en-MY", { dateStyle: "medium", timeStyle: "short" }).format(new Date(check.createdAt))}</small><span className={check.recommendation === "doctor_attention" ? "attention" : "monitor"}>{check.recommendation === "doctor_attention" ? "Doctor’s attention advised" : "Continue monitoring"}</span></div>
+        </article>)}
+      </aside>
+    </div>
+    {cameraOpen && <div className="camera-modal" role="dialog" aria-modal="true" aria-labelledby="camera-title">
+      <div className="camera-dialog">
+        <div className="camera-head"><div><p className="eyebrow">LIVE CAMERA</p><h2 id="camera-title">Take a current photograph</h2></div><button type="button" className="icon-button" onClick={() => setCameraOpen(false)} aria-label="Close camera"><X /></button></div>
+        <div className="camera-view"><video ref={videoRef} autoPlay playsInline muted />{cameraError && <p role="alert">{cameraError}</p>}</div>
+        <p className="camera-guidance">Use good lighting and keep the wound or affected area clearly visible.</p>
+        <div className="camera-actions"><button type="button" className="secondary" onClick={() => setCameraOpen(false)}>Cancel</button><button type="button" className="primary" onClick={captureImage} disabled={Boolean(cameraError)}><Camera size={18} /> Capture photograph</button></div>
+      </div>
+    </div>}
+    {result && <div className="result-modal" role="dialog" aria-modal="true" aria-labelledby="foot-result-title"><div className={`result-dialog ${result.recommendation}`}>
+      <span className="result-symbol">{result.recommendation === "doctor_attention" ? "!" : "✓"}</span>
+      <h2 id="foot-result-title">{result.recommendation === "doctor_attention" ? "This needs a doctor’s attention" : result.symptomCount === 1 ? "Keep a close eye on the affected area" : "No warning signs reported"}</h2>
+      <p>{result.recommendation === "doctor_attention" ? `You reported ${result.symptomCount} of 3 warning signs. Contact your doctor or diabetes care team promptly for advice.` : result.symptomCount === 1 ? "You reported 1 of 3 warning signs. Monitor the area closely and seek medical help immediately if it worsens or another sign appears." : "Continue checking the wound or affected area and contact your care team if redness, swelling, warmth, discharge, or colour changes develop."}</p>
+      <p className="result-note">Your answers and photograph have been saved privately to your CareLink record. This is not an AI diagnosis.</p>
+      <button className="primary wide" onClick={reset}>Done</button>
+    </div></div>}
+  </>;
+}
+
 function ProfilePage({
-  logout,
   language,
+  data,
 }: {
-  logout: () => void;
   language: Language;
+  data: CareLinkPatientData;
 }) {
-  const [large, setLarge] = useState(false),
-    [dark, setDark] = useState(false);
   return (
-    <div className={`${large ? "large-text" : ""} ${dark ? "dark-card" : ""}`}>
+    <div>
       <div className="page-intro">
         <div>
           <p className="eyebrow">ACCOUNT & PREFERENCES</p>
@@ -1036,14 +1215,14 @@ function ProfilePage({
       </div>
       <div className="profile-grid">
         <article className="card profile-card">
-          <div className="profile-avatar">SA</div>
-          <h3>Sarah Ahmad</h3>
-          <p>Patient ID · CL-10482</p>
-          <StatusBadge status="Type 2 diabetes" />
+          <div className="profile-avatar">{initials(data.profile.fullName)}</div>
+          <h3>{data.profile.fullName}</h3>
+          <p>Patient ID · {data.profile.patientId}</p>
+          <StatusBadge status={data.profile.diabetesType} />
           <div className="profile-fields">
             <div>
               <small>Date of birth</small>
-              <strong>14 March 1972</strong>
+              <strong>{displayDate(data.profile.dateOfBirth)}</strong>
             </div>
             <div>
               <small>Contact</small>
@@ -1051,7 +1230,7 @@ function ProfilePage({
             </div>
             <div>
               <small>Email</small>
-              <strong>sarah.ahmad@example.com</strong>
+              <strong>{data.profile.email}</strong>
             </div>
             <div>
               <small>Preferred language</small>
@@ -1068,7 +1247,7 @@ function ProfilePage({
                 <Stethoscope />
                 <span>
                   <b>Primary doctor</b>
-                  <small>Dr. Michelle Lim</small>
+                  <small>{data.record.appointments[0]?.doctor}</small>
                 </span>
               </span>
               <button>Manage</button>
@@ -1094,51 +1273,6 @@ function ProfilePage({
               <button>Edit</button>
             </div>
           </article>
-          <article className="card settings-card">
-            <h3>Accessibility & appearance</h3>
-            <div className="setting-line">
-              <span>
-                <Activity />
-                <span>
-                  <b>Larger text</b>
-                  <small>Increase text throughout the portal</small>
-                </span>
-              </span>
-              <button
-                className={`toggle ${large ? "on" : ""}`}
-                onClick={() => setLarge(!large)}
-                aria-label="Toggle larger text"
-              >
-                <i />
-              </button>
-            </div>
-            <div className="setting-line">
-              <span>
-                <Moon />
-                <span>
-                  <b>Dark mode</b>
-                  <small>Reduce brightness in low light</small>
-                </span>
-              </span>
-              <button
-                className={`toggle ${dark ? "on" : ""}`}
-                onClick={() => setDark(!dark)}
-                aria-label="Toggle dark mode"
-              >
-                <i />
-              </button>
-            </div>
-            <div className="setting-line">
-              <span>
-                <Bell />
-                <span>
-                  <b>Notifications</b>
-                  <small>Appointments and test reminders</small>
-                </span>
-              </span>
-              <button>Manage</button>
-            </div>
-          </article>
           <article className="card settings-card privacy">
             <ShieldCheck />
             <div>
@@ -1150,25 +1284,86 @@ function ProfilePage({
               <button className="link">Read privacy information →</button>
             </div>
           </article>
-          <button className="logout" onClick={logout}>
-            <LogOut /> Sign out of CareLink
-          </button>
         </div>
       </div>
     </div>
   );
 }
 
+function SettingsPage({ largeText, darkMode, onLargeText, onDarkMode, logout }: {
+  largeText: boolean; darkMode: boolean; onLargeText: () => void;
+  onDarkMode: () => void; logout: () => Promise<void>;
+}) {
+  return <>
+    <div className="page-intro"><div><p className="eyebrow">PORTAL SETTINGS</p><h2>Accessibility & appearance</h2><p>Adjust CareLink for comfortable reading and viewing.</p></div></div>
+    <div className="settings-page-stack">
+      <article className="card settings-card">
+        <div className="setting-line"><span><Activity /><span><b>Larger text</b><small>Increase the entire portal display by 30%</small></span></span><button className={`toggle ${largeText ? "on" : ""}`} onClick={onLargeText} aria-label="Toggle larger text" aria-pressed={largeText}><i /></button></div>
+        <div className="setting-line"><span><Moon /><span><b>Dark mode</b><small>Use a comfortable low-light colour palette throughout CareLink</small></span></span><button className={`toggle ${darkMode ? "on" : ""}`} onClick={onDarkMode} aria-label="Toggle dark mode" aria-pressed={darkMode}><i /></button></div>
+        <div className="setting-line"><span><Bell /><span><b>Notifications</b><small>Appointments and test reminders</small></span></span><button>Manage</button></div>
+      </article>
+      <button className="logout" onClick={logout}><LogOut /> Sign out of CareLink</button>
+    </div>
+  </>;
+}
+
 export default function HomePage() {
-  const [logged, setLogged] = useState(false),
+  const [patientData, setPatientData] = useState<CareLinkPatientData | null>(null),
+    [accessToken, setAccessToken] = useState(""),
+    [authLoading, setAuthLoading] = useState(true),
     [page, setPage] = useState<Page>("dashboard"),
     [menu, setMenu] = useState(false),
-    [language, setLanguage] = useState<Language>("en");
+    [largeText, setLargeText] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("carelink-large-text") === "true"),
+    [darkMode, setDarkMode] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("carelink-dark-mode") === "true"),
+    [language, setLanguage] = useState<Language>(() =>
+      typeof window !== "undefined" && window.localStorage.getItem("carelink-language") === "ms" ? "ms" : "en",
+    );
   useEffect(() => {
-    const saved = window.localStorage.getItem("carelink-language");
-    if (saved === "ms") setLanguage("ms");
+    let active = true;
+    restorePatientSession().then((session) => {
+      if (active && session) {
+        setPatientData(session.patient);
+        setAccessToken(session.accessToken);
+      }
+    }).finally(() => { if (active) setAuthLoading(false); });
+    return () => { active = false; };
   }, []);
-  useEffect(() => applyLanguage(language), [language, page, logged]);
+  useEffect(() => applyLanguage(language), [language, page, patientData]);
+  useEffect(() => {
+    document.documentElement.classList.toggle("large-text-mode", largeText);
+    document.documentElement.classList.toggle("dark-mode", darkMode);
+    return () => {
+      document.documentElement.classList.remove("large-text-mode", "dark-mode");
+    };
+  }, [largeText, darkMode]);
+  useEffect(() => {
+    const resizeText = (root: ParentNode) => {
+      const elements = root instanceof HTMLElement
+        ? [root, ...root.querySelectorAll<HTMLElement>("*:not(svg):not(path):not(style):not(script)")]
+        : [...root.querySelectorAll<HTMLElement>("*:not(svg):not(path):not(style):not(script)")];
+      elements.forEach((element) => {
+        if (element instanceof SVGElement || element.tagName === "STYLE" || element.tagName === "SCRIPT") return;
+        const saved = element.dataset.carelinkFontSize;
+        if (largeText) {
+          const original = saved ? Number(saved) : Number.parseFloat(window.getComputedStyle(element).fontSize);
+          if (!Number.isFinite(original) || original <= 0) return;
+          if (!saved) element.dataset.carelinkFontSize = String(original);
+          element.style.setProperty("font-size", `${original * 1.3}px`, "important");
+        } else if (saved) {
+          element.style.removeProperty("font-size");
+          delete element.dataset.carelinkFontSize;
+        }
+      });
+    };
+    resizeText(document.body);
+    const observer = new MutationObserver((records) => records.forEach((record) =>
+      record.addedNodes.forEach((node) => {
+        if (node instanceof HTMLElement) resizeText(node);
+      }),
+    ));
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [largeText, page, patientData]);
   const changeLanguage = () =>
     setLanguage((current) => {
       const next = current === "en" ? "ms" : "en";
@@ -1176,10 +1371,23 @@ export default function HomePage() {
       return next;
     });
   const title = useMemo(
-    () => nav.find((x) => x.id === page)?.label || "Home",
+    () => page === "settings" ? "Settings" : nav.find((x) => x.id === page)?.label || "Home",
     [page],
   );
-  if (!logged) return <Login onLogin={() => setLogged(true)} />;
+  const login = async (email: string, password: string) => {
+    const session = await signInPatient(email, password);
+    setPatientData(session.patient);
+    setAccessToken(session.accessToken);
+  };
+  const logout = async () => { await signOutPatient(); setPatientData(null); setAccessToken(""); setPage("dashboard"); };
+  const toggleLargeText = () => setLargeText((current) => {
+    const next = !current; window.localStorage.setItem("carelink-large-text", String(next)); return next;
+  });
+  const toggleDarkMode = () => setDarkMode((current) => {
+    const next = !current; window.localStorage.setItem("carelink-dark-mode", String(next)); return next;
+  });
+  if (authLoading) return <main className="login-page"><section className="login-side"><Brand /></section><section className="login-panel"><p>Loading your secure patient portal…</p></section></main>;
+  if (!patientData) return <Login onLogin={login} />;
   const go = (p: Page) => {
     setPage(p);
     setMenu(false);
@@ -1218,12 +1426,12 @@ export default function HomePage() {
           <button>Contact clinic</button>
         </div>
         <div className="sidebar-profile">
-          <div className="avatar">SA</div>
+          <div className="avatar">{initials(patientData.profile.fullName)}</div>
           <div>
-            <strong>Sarah Ahmad</strong>
-            <small>Patient · CL-10482</small>
+            <strong>{patientData.profile.fullName}</strong>
+            <small>Patient · {patientData.profile.patientId}</small>
           </div>
-          <Settings size={18} />
+          <button className={`sidebar-settings ${page === "settings" ? "active" : ""}`} onClick={() => go("settings")} aria-label="Open settings"><Settings size={18} /></button>
         </div>
       </aside>
       {menu && (
@@ -1239,16 +1447,17 @@ export default function HomePage() {
           onMenu={() => setMenu(true)}
           language={language}
           onLanguageChange={changeLanguage}
+          patientName={patientData.profile.fullName}
         />
         <div className="content">
-          {page === "dashboard" && <Dashboard go={go} />}{" "}
-          {page === "summary" && <SummaryPage go={go} />}{" "}
-          {page === "assistant" && <AssistantPage language={language} />}{" "}
-          {page === "ckd" && <PossibleRisksPage />}{" "}
-          {page === "results" && <ResultsPage />}{" "}
-          {page === "profile" && (
-            <ProfilePage logout={() => setLogged(false)} language={language} />
-          )}
+          {page === "dashboard" && <Dashboard go={go} data={patientData} />}{" "}
+          {page === "summary" && <SummaryPage go={go} data={patientData} />}{" "}
+          {page === "assistant" && <AssistantPage language={language} data={patientData} accessToken={accessToken} />}{" "}
+          {page === "ckd" && <PossibleRisksPage data={patientData} />}{" "}
+          {page === "results" && <ResultsPage data={patientData} />}{" "}
+          {page === "footcheck" && <FootHealthPage userId={patientData.profile.id} />}{" "}
+          {page === "profile" && <ProfilePage language={language} data={patientData} />}
+          {page === "settings" && <SettingsPage largeText={largeText} darkMode={darkMode} onLargeText={toggleLargeText} onDarkMode={toggleDarkMode} logout={logout} />}
         </div>
       </main>
       <nav className="bottom-nav">

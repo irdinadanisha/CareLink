@@ -1,101 +1,199 @@
-# vinext-starter
+# CareLink
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+CareLink is an offline-capable, multilingual patient health portal designed for people managing diabetes in Malaysia. It brings health summaries, test results, risk estimates, wound monitoring, chat history, and an AI health assistant into one calm, patient-friendly experience.
 
-## Prerequisites
+The project is built for real-world constraints: patients may have only a phone, intermittent 3G connectivity, and limited access to clinic systems. CareLink keeps essential records and actions available locally, then synchronizes changes when connectivity returns.
+
+## Highlights
+
+- 🌏 English, Bahasa Melayu, Mandarin Chinese, and Tamil interfaces
+- 📱 Responsive patient portal designed for phone-first use
+- 📴 Offline access to cached patient records, saved conversations, and wound-check photos
+- 🔄 Local-first synchronization for pending wound checks and chat history
+- 🤖 AI health assistant powered by `openai/gpt-oss-20b` through Groq
+- 🧠 Offline assistant responses based on the patient’s saved record
+- 📊 Browser-based Random Forest estimates for nephropathy and neuropathy risk
+- 🩸 Patient-friendly explanations for HbA1c, glucose, blood pressure, kidney function, and other results
+- 📷 Wound health checks with local image storage and symptom-based follow-up guidance
+- 🔐 Offline PIN unlock, shared-device timeout, and doctor-triggered session revocation
+- 🗂️ Conversation history with deterministic summaries and text downloads
+
+## Why CareLink?
+
+Many health portals assume reliable internet access and clinical terminology that patients already understand. CareLink is designed around a different reality: a patient should be able to open her record, understand a result, save a wound photograph, and ask a focused question even when the connection is weak or unavailable.
+
+The portal supports clinicians without presenting itself as a replacement for them. Risk percentages are clearly labelled as model estimates, AI responses are educational, and urgent symptoms are directed to professional or emergency care.
+
+## Main Workflows
+
+### Understand health results
+
+The dashboard presents the latest measurements, trends, targets, explanations, and model-estimated complication risks in plain language. Clinical summaries are organized into readable sections instead of dense medical notes.
+
+### Ask the AI assistant
+
+Patients can ask questions about their own saved record. Online requests use the hosted AI assistant and include the selected language. Offline requests use a small deterministic response layer based on saved values such as HbA1c, glucose, kidney function, medication, and the next appointment.
+
+Every conversation is saved locally first. When online, it is synchronized to the `chat_conversations` Supabase table for authorized follow-up workflows.
+
+### Monitor wound health
+
+Patients answer three simple questions about redness, swelling, and warmth, then upload or capture a photograph. The result is saved locally and queued for synchronization when needed.
+
+The guidance is intentionally simple:
+
+- `3/3`: high priority; contact the clinic as soon as possible to reschedule
+- `2/3`: contact the clinic and keep watching the wound
+- `1/3`: keep watching the wound until the next appointment
+- `0/3`: continue routine monitoring
+
+This checklist does not diagnose a wound from a photograph.
+
+### Protect offline records
+
+Patients can create a device PIN for offline records. The app locks again when it returns from the background. If the device is not marked as personal, CareLink automatically signs out after 30 minutes of inactivity.
+
+A doctor portal can revoke a patient’s CareLink app session through the protected `/api/doctor/revoke-patient-session` endpoint. The patient device applies the revocation the next time it reconnects.
+
+## Technology
+
+- Next.js `16.2.6` with React `19`
+- TypeScript
+- Supabase Auth, Postgres, Storage, and Row Level Security
+- Groq SDK using `openai/gpt-oss-20b`
+- Recharts for trends and dashboards
+- Lucide React for interface icons
+- IndexedDB and browser storage for offline records
+- Optional ARM64 Docker deployment with Ollama on NVIDIA Jetson
+
+## Getting Started
+
+### Requirements
 
 - Node.js `>=22.13.0`
+- npm
+- A Supabase project for online authentication and patient data
 
-## Quick Start
+### Install and run
 
 ```bash
 npm install
 npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Environment variables
+
+Create `.env.local` with the public Supabase settings and the server-side Groq key:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+GROQ_API_KEY=your_groq_api_key
+SUPABASE_SECRET_KEY=your_server_only_secret_key
+```
+
+Never expose `SUPABASE_SECRET_KEY` or `GROQ_API_KEY` to the browser. Variables beginning with `NEXT_PUBLIC_` are intentionally public.
+
+### Database setup
+
+Run the SQL migrations in `supabase/migrations/` against the project’s Supabase database. They create the patient records, wound checks, chat history, delete policies, and session-revocation marker used by the application.
+
+The session-revocation migration is:
+
+```text
+supabase/migrations/202610040004_add_session_revocation.sql
+```
+
+## Testing and Verification
+
+```bash
+npm run lint
 npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+The build verifies the Next.js production bundle and the server routes, including the doctor session-revocation endpoint.
 
-## Included Shape
+For a meaningful manual check, test the portal in this order:
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+1. Sign in while online and create an offline PIN.
+2. Disconnect the device and open the dashboard, chat history, and wound-check history.
+3. Save a new chat or wound check while offline.
+4. Reconnect and confirm the pending data synchronizes.
+5. Change the interface language and verify the patient-facing screens and assistant responses.
 
-## Workspace Auth Headers
+## Architecture at a Glance
 
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
+```text
+Patient phone
+  ├─ Next.js patient portal
+  ├─ IndexedDB: cached records, wound images, pending actions
+  ├─ Browser storage: language, chat history, PIN verifier, sync markers
+  └─ Service worker: application shell caching
 
-The user ID is stable for the same user on the same Site and different across Sites. Email and name are intended for display or contact purposes.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+Online services
+  ├─ Supabase Auth and Postgres
+  ├─ Supabase Storage for wound photographs
+  ├─ Groq: openai/gpt-oss-20b
+  └─ Doctor portal session-revocation API
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+The browser-based risk models do not require a network request. Online AI requests go through the CareLink server route, which authenticates the patient and retrieves the patient record server-side before calling Groq.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+## Privacy and Safety
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+CareLink handles health information and should be deployed as a secured clinical prototype, not as an unreviewed medical device. Important boundaries include:
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+- AI responses provide general educational information and do not diagnose or prescribe.
+- Random Forest outputs are estimates, not diagnoses.
+- The wound checklist does not analyze or diagnose photographs.
+- Conversations and wound checks are stored locally and may synchronize to Supabase.
+- Doctors should confirm important information through the appropriate clinical workflow.
+- Emergency symptoms should be handled by emergency services or a qualified healthcare professional.
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+The offline PIN protects the application interface and cached workflow. Device-level encryption, operating-system security, secure backups, and clinic identity policies remain important for production deployment.
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+## Optional Jetson Deployment
 
-## Useful Commands
+CareLink can run as an ARM64 Docker deployment with Ollama on an NVIDIA Jetson. See [`JETSON_DEPLOYMENT.md`](JETSON_DEPLOYMENT.md) for the complete setup, networking, model, and troubleshooting instructions.
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+```bash
+docker compose -f compose.jetson.yml up -d --build
+```
 
-## Learn More
+## Project Structure
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
-# CareLink
+```text
+app/
+  page.tsx                         Patient portal UI
+  api/chat/                        Authenticated AI assistant route
+  api/doctor/                      Doctor security actions
+  api/local-*                      Local deployment and sync routes
+src/services/
+  patientDataService.ts            Supabase session and patient cache
+  offlineStore.ts                  IndexedDB records and wound images
+  chatHistoryService.ts            Local/cloud conversation synchronization
+  footCheckService.ts              Wound-check workflow and sync queue
+  llamaService.ts                  Online and offline assistant responses
+  deviceSecurityService.ts         PIN and shared-device protection
+  randomForest*Service.ts          Browser-based risk estimates
+src/i18n/malay.ts                  Language dictionaries and fallbacks
+supabase/migrations/               Database schema and RLS policies
+```
+
+## Contributing and Feedback
+
+CareLink is being developed as a patient-centered clinical technology project. Useful contributions include:
+
+- testing offline and low-connectivity workflows on real phones
+- reviewing translations with native speakers
+- checking accessibility and readability
+- improving clinical safety copy with qualified professionals
+- proposing issues or usability improvements
+
+Please open an issue with clear reproduction steps, device/browser details, language, and whether the test was online or offline.
+
+## Team
+
+CareLink is built by a student project team focused on making health information easier to understand and more usable across Malaysia’s multilingual communities.

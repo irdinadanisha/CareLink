@@ -397,6 +397,12 @@ Object.assign(ms, {
   "Delete this wound check?": "Padam pemeriksaan luka ini?",
   "Deleted locally. It will sync when internet returns.": "Dipadam setempat. Ia akan disegerakkan apabila internet kembali.",
   "This needs a doctor’s attention": "Keadaan ini memerlukan perhatian doktor", "Keep a close eye on your foot": "Pantau kaki anda dengan teliti", "No warning signs reported": "Tiada tanda amaran dilaporkan",
+  "High priority: call your clinic to reschedule your appointment as soon as possible.": "Keutamaan tinggi: hubungi klinik anda untuk menjadualkan semula janji temu secepat mungkin.",
+  "Call your clinic and keep an eye on the wound.": "Hubungi klinik anda dan pantau luka tersebut.",
+  "Keep an eye on the wound until your next appointment.": "Pantau luka tersebut sehingga janji temu anda yang seterusnya.",
+  "You reported all 3 warning signs. Please call your clinic as soon as possible to reschedule your appointment.": "Anda melaporkan kesemua 3 tanda amaran. Sila hubungi klinik anda secepat mungkin untuk menjadualkan semula janji temu.",
+  "You reported 2 of 3 warning signs. Please call your clinic and keep an eye on the wound until you receive advice.": "Anda melaporkan 2 daripada 3 tanda amaran. Sila hubungi klinik anda dan pantau luka tersebut sehingga anda menerima nasihat.",
+  "You reported 1 of 3 warning signs. Keep an eye on the wound until your next appointment and seek medical help if it worsens or another sign appears.": "Anda melaporkan 1 daripada 3 tanda amaran. Pantau luka tersebut sehingga janji temu seterusnya dan dapatkan bantuan perubatan jika keadaan bertambah teruk atau tanda lain muncul.",
   "Done": "Selesai",
 });
 
@@ -675,6 +681,12 @@ const zh: Record<string, string> = {
   "This needs a doctor’s attention": "这需要医生关注",
   "Keep a close eye on the affected area": "请密切观察受影响区域",
   "No warning signs reported": "未报告警示征兆",
+  "High priority: call your clinic to reschedule your appointment as soon as possible.": "高优先级：请尽快联系诊所重新安排您的预约。",
+  "Call your clinic and keep an eye on the wound.": "请联系诊所并观察伤口情况。",
+  "Keep an eye on the wound until your next appointment.": "请观察伤口，直到下一次预约。",
+  "You reported all 3 warning signs. Please call your clinic as soon as possible to reschedule your appointment.": "您报告了全部 3 个警示征兆。请尽快联系诊所重新安排预约。",
+  "You reported 2 of 3 warning signs. Please call your clinic and keep an eye on the wound until you receive advice.": "您报告了 3 个警示征兆中的 2 个。请联系诊所，并在获得建议前观察伤口。",
+  "You reported 1 of 3 warning signs. Keep an eye on the wound until your next appointment and seek medical help if it worsens or another sign appears.": "您报告了 3 个警示征兆中的 1 个。请观察伤口直到下一次预约；如果情况恶化或出现其他征兆，请寻求医疗帮助。",
   "Done": "完成",
 };
 
@@ -942,6 +954,12 @@ const ta: Record<string, string> = {
   "This needs a doctor’s attention": "இதற்கு மருத்துவரின் கவனம் தேவை",
   "Keep a close eye on the affected area": "பாதிக்கப்பட்ட பகுதியை நெருக்கமாக கவனிக்கவும்",
   "No warning signs reported": "எச்சரிக்கை அறிகுறிகள் எதுவும் தெரிவிக்கப்படவில்லை",
+  "High priority: call your clinic to reschedule your appointment as soon as possible.": "அதிக முன்னுரிமை: உங்கள் சந்திப்பை விரைவில் மாற்றியமைக்க மருத்துவமனையை தொடர்புகொள்ளுங்கள்.",
+  "Call your clinic and keep an eye on the wound.": "மருத்துவமனையை தொடர்புகொண்டு காயத்தை கவனமாக கண்காணிக்கவும்.",
+  "Keep an eye on the wound until your next appointment.": "அடுத்த சந்திப்பு வரை காயத்தை கவனமாக கண்காணிக்கவும்.",
+  "You reported all 3 warning signs. Please call your clinic as soon as possible to reschedule your appointment.": "மூன்று எச்சரிக்கை அறிகுறிகளையும் தெரிவித்துள்ளீர்கள். உங்கள் சந்திப்பை விரைவில் மாற்றியமைக்க மருத்துவமனையை தொடர்புகொள்ளுங்கள்.",
+  "You reported 2 of 3 warning signs. Please call your clinic and keep an eye on the wound until you receive advice.": "மூன்று எச்சரிக்கை அறிகுறிகளில் இரண்டைத் தெரிவித்துள்ளீர்கள். மருத்துவமனையை தொடர்புகொண்டு ஆலோசனை கிடைக்கும் வரை காயத்தை கண்காணிக்கவும்.",
+  "You reported 1 of 3 warning signs. Keep an eye on the wound until your next appointment and seek medical help if it worsens or another sign appears.": "மூன்று எச்சரிக்கை அறிகுறிகளில் ஒன்றைத் தெரிவித்துள்ளீர்கள். அடுத்த சந்திப்பு வரை காயத்தை கண்காணிக்கவும்; நிலை மோசமானால் அல்லது வேறு அறிகுறி தோன்றினால் மருத்துவ உதவி பெறுங்கள்.",
   "Done": "முடிந்தது",
 };
 

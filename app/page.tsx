@@ -8,10 +8,13 @@ import {
   Camera,
   CalendarDays,
   ClipboardList,
+  Download,
   Droplets,
   Eye,
   EyeOff,
+  FileText,
   HeartPulse,
+  History,
   Home,
   Info,
   Languages,
@@ -20,13 +23,13 @@ import {
   MessageCircle,
   Moon,
   Pill,
+  Plus,
   Send,
   Settings,
   ShieldCheck,
   Sparkles,
   Stethoscope,
   TestTube2,
-  Trash2,
   Upload,
   User,
   X,
@@ -46,7 +49,7 @@ import {
 import { predictNephropathyRisk } from "@/src/services/randomForestNephropathyService";
 import { predictNeuropathyRisk } from "@/src/services/randomForestNeuropathyService";
 import { sendMessageToLlama } from "@/src/services/llamaService";
-import type { BloodTestResult, ChatMessage, Page } from "@/src/types";
+import type { BloodTestResult, ChatConversation, ChatMessage, Page } from "@/src/types";
 import { KidneysIcon } from "@/src/components/KidneysIcon";
 import { NeuropathyIcon } from "@/src/components/NeuropathyIcon";
 import {
@@ -147,6 +150,124 @@ function AssistantResponse({ content }: { content: string }) {
   });
   flushBullets();
   return <div className="assistant-response">{blocks}</div>;
+}
+
+const chatHistoryStorageKey = (patientId: string) => `carelink-chat-history-${patientId}`;
+
+const hasPatientMessages = (messages: ChatMessage[]) => messages.some((message) => message.role === "user");
+
+const conversationTitle = (messages: ChatMessage[], fallback: string) => {
+  const firstQuestion = messages.find((message) => message.role === "user")?.content.trim();
+  if (!firstQuestion) return fallback;
+  return firstQuestion.length > 58 ? `${firstQuestion.slice(0, 55)}...` : firstQuestion;
+};
+
+const summaryLabels: Record<Language, { discussed: string; messages: string; keyQuestions: string; takeaway: string; actions: string; noActions: string; transcript: string; patient: string; assistant: string }> = {
+  en: {
+    discussed: "Conversation summary",
+    messages: "Messages",
+    keyQuestions: "Main questions",
+    takeaway: "Main takeaway",
+    actions: "Possible follow-up points",
+    noActions: "No specific follow-up point was detected.",
+    transcript: "Transcript",
+    patient: "Patient",
+    assistant: "Care Assistant",
+  },
+  ms: {
+    discussed: "Ringkasan perbualan",
+    messages: "Mesej",
+    keyQuestions: "Soalan utama",
+    takeaway: "Inti utama",
+    actions: "Perkara susulan yang mungkin",
+    noActions: "Tiada perkara susulan khusus dikesan.",
+    transcript: "Transkrip",
+    patient: "Pesakit",
+    assistant: "Pembantu Penjagaan",
+  },
+  zh: {
+    discussed: "对话摘要",
+    messages: "消息",
+    keyQuestions: "主要问题",
+    takeaway: "主要要点",
+    actions: "可能的跟进事项",
+    noActions: "未检测到具体跟进事项。",
+    transcript: "完整记录",
+    patient: "患者",
+    assistant: "护理助手",
+  },
+  ta: {
+    discussed: "உரையாடல் சுருக்கம்",
+    messages: "செய்திகள்",
+    keyQuestions: "முக்கிய கேள்விகள்",
+    takeaway: "முக்கிய கருத்து",
+    actions: "சாத்தியமான பின்தொடர்பு குறிப்புகள்",
+    noActions: "குறிப்பிட்ட பின்தொடர்பு எதுவும் கண்டறியப்படவில்லை.",
+    transcript: "உரைப்பதிவு",
+    patient: "நோயாளர்",
+    assistant: "பராமரிப்பு உதவியாளர்",
+  },
+};
+
+function summarizeConversation(conversation: ChatConversation, language: Language) {
+  const labels = summaryLabels[language];
+  const userMessages = conversation.messages.filter((message) => message.role === "user");
+  const assistantMessages = conversation.messages.filter((message) => message.role === "assistant" && message.id !== "1");
+  const questions = userMessages.map((message) => formatAssistantText(message.content)).slice(0, 4);
+  const assistantText = assistantMessages.map((message) => formatAssistantText(message.content)).join(" ");
+  const followUps = assistantText
+    .split(/(?<=[.!?。！？])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) =>
+      /(doctor|clinician|care team|appointment|monitor|continue|metformin|medication|follow|discuss|contact|doktor|klinik|temu janji|pantau|teruskan|医生|护理团队|复诊|继续|监测|联系|மருத்துவர்|பராமரிப்பு|சந்திப்பு|தொடர்ந்து|கண்காணிக்க)/i.test(sentence),
+    )
+    .slice(0, 3);
+  const assistantWordCount = assistantText.split(/\s+/).filter(Boolean).length;
+  const takeaway =
+    assistantWordCount > 0
+      ? formatAssistantText(assistantMessages[assistantMessages.length - 1]?.content ?? "").split(/\n+/).find(Boolean)?.slice(0, 180)
+      : "";
+
+  return {
+    labels,
+    questions,
+    followUps,
+    takeaway,
+    messageCount: userMessages.length + assistantMessages.length,
+  };
+}
+
+function downloadConversation(conversation: ChatConversation, language: Language) {
+  const summary = summarizeConversation(conversation, language);
+  const transcript = conversation.messages
+    .filter((message) => message.id !== "1" || hasPatientMessages(conversation.messages))
+    .map((message) => `${message.role === "user" ? summary.labels.patient : summary.labels.assistant} (${message.time})\n${formatAssistantText(message.content)}`)
+    .join("\n\n");
+  const content = [
+    conversation.title,
+    `${summary.labels.discussed} - ${new Date(conversation.updatedAt).toLocaleString()}`,
+    "",
+    `${summary.labels.messages}: ${summary.messageCount}`,
+    "",
+    summary.labels.keyQuestions,
+    ...(summary.questions.length ? summary.questions.map((question) => `- ${question}`) : ["- -"]),
+    "",
+    summary.labels.takeaway,
+    summary.takeaway || "-",
+    "",
+    summary.labels.actions,
+    ...(summary.followUps.length ? summary.followUps.map((point) => `- ${point}`) : [`- ${summary.labels.noActions}`]),
+    "",
+    summary.labels.transcript,
+    transcript,
+  ].join("\n");
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${conversation.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "carelink-chat"}.txt`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 const nav = [
@@ -735,6 +856,7 @@ const starters = [
 ];
 function AssistantPage({ language, data, accessToken }: { language: Language; data: CareLinkPatientData; accessToken: string }) {
   const firstName = data.profile.fullName.split(" ")[0];
+  const storageKey = chatHistoryStorageKey(data.profile.patientId);
   const initial = useMemo<ChatMessage[]>(() => {
     const greetings: Record<Language, string> = {
       en: `Hello ${firstName} — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?`,
@@ -751,14 +873,94 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
       },
     ];
   }, [firstName, language]);
-  const [messages, setMessages] = useState(initial),
+  const [activeConversationId, setActiveConversationId] = useState(() => crypto.randomUUID()),
+    [history, setHistory] = useState<ChatConversation[]>([]),
+    [historyReady, setHistoryReady] = useState(false),
+    [showHistory, setShowHistory] = useState(true),
+    [messages, setMessages] = useState(initial),
     [text, setText] = useState(""),
     [typing, setTyping] = useState(false);
+  const activeConversation = useMemo(
+    () =>
+      history.find((conversation) => conversation.id === activeConversationId) ?? {
+        id: activeConversationId,
+        title: conversationTitle(messages, translate("New conversation", language)),
+        language,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messages,
+      },
+    [activeConversationId, history, language, messages],
+  );
+  const visibleHistory = history.filter((conversation) => hasPatientMessages(conversation.messages));
+  const activeSummary = summarizeConversation(activeConversation, language);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) {
+        setHistory([]);
+        setActiveConversationId(crypto.randomUUID());
+        setMessages(initial);
+        setHistoryReady(true);
+        return;
+      }
+      const parsed = JSON.parse(raw) as { activeConversationId?: string; conversations?: ChatConversation[] };
+      const savedConversations = Array.isArray(parsed.conversations) ? parsed.conversations : [];
+      const savedActiveId = parsed.activeConversationId ?? savedConversations[0]?.id ?? crypto.randomUUID();
+      const savedActive = savedConversations.find((conversation) => conversation.id === savedActiveId);
+      setHistory(savedConversations);
+      setActiveConversationId(savedActiveId);
+      setMessages(savedActive?.messages?.length ? savedActive.messages : initial);
+    } catch {
+      setHistory([]);
+      setActiveConversationId(crypto.randomUUID());
+      setMessages(initial);
+    } finally {
+      setHistoryReady(true);
+    }
+  }, [initial, storageKey]);
+
   useEffect(() => {
     setMessages((current) =>
       current.length === 1 && current[0]?.id === "1" ? initial : current,
     );
   }, [initial]);
+
+  useEffect(() => {
+    if (!historyReady) return;
+    const now = new Date().toISOString();
+    setHistory((current) => {
+      const existing = current.find((conversation) => conversation.id === activeConversationId);
+      const updated: ChatConversation = {
+        id: activeConversationId,
+        title: conversationTitle(messages, translate("New conversation", language)),
+        language,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        messages,
+      };
+      const next = [
+        updated,
+        ...current.filter((conversation) => conversation.id !== activeConversationId),
+      ].slice(0, 50);
+      localStorage.setItem(storageKey, JSON.stringify({ activeConversationId, conversations: next }));
+      return next;
+    });
+  }, [activeConversationId, historyReady, language, messages, storageKey]);
+
+  function startNewConversation() {
+    setActiveConversationId(crypto.randomUUID());
+    setMessages(initial);
+    setText("");
+  }
+
+  function openConversation(conversation: ChatConversation) {
+    setActiveConversationId(conversation.id);
+    setMessages(conversation.messages);
+    setText("");
+  }
+
   async function send(value = text) {
     if (!value.trim() || typing) return;
     const msg: ChatMessage = {
@@ -807,102 +1009,164 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
           <h2>AI Health Assistant</h2>
           <p>Ask questions about your diabetes, results, and care plan.</p>
         </div>
-        <button className="secondary" onClick={() => setMessages(initial)}>
-          <Trash2 size={17} /> Clear conversation
-        </button>
+        <div className="button-row compact-actions">
+          <button className="secondary" onClick={() => setShowHistory((current) => !current)}>
+            <History size={17} /> {translate("Chat history", language)}
+          </button>
+          <button className="secondary" onClick={startNewConversation}>
+            <Plus size={17} /> {translate("New conversation", language)}
+          </button>
+        </div>
       </div>
       <Notice kind="warning">
         This AI provides general educational information. It does not diagnose,
         prescribe treatment, or replace your doctor.
       </Notice>
-      <div className="chat-shell">
-        <div className="chat-head">
-          <div className="bot-avatar">
-            <Bot />
+      <div className={`assistant-layout ${showHistory ? "" : "history-hidden"}`}>
+        {showHistory && (
+          <aside className="chat-history-panel card">
+            <div className="card-head">
+              <div>
+                <p className="eyebrow">{translate("Saved locally", language)}</p>
+                <h3>{translate("Chat history", language)}</h3>
+              </div>
+              <span className="soft-icon">
+                <History />
+              </span>
+            </div>
+            {visibleHistory.length ? (
+              <div className="history-list">
+                {visibleHistory.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    className={conversation.id === activeConversationId ? "selected" : ""}
+                    onClick={() => openConversation(conversation)}
+                  >
+                    <strong>{conversation.title}</strong>
+                    <small>{displayDateTime(conversation.updatedAt, language)}</small>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="history-empty">{translate("Your saved conversations will appear here.", language)}</p>
+            )}
+            {hasPatientMessages(activeConversation.messages) && (
+              <div className="conversation-summary">
+                <div className="summary-mini-head">
+                  <FileText size={17} />
+                  <strong>{translate("Conversation summary", language)}</strong>
+                </div>
+                <small>{activeSummary.labels.messages}: {activeSummary.messageCount}</small>
+                <h4>{activeSummary.labels.keyQuestions}</h4>
+                <ul>
+                  {activeSummary.questions.map((question) => (
+                    <li key={question}>{question}</li>
+                  ))}
+                </ul>
+                <h4>{activeSummary.labels.takeaway}</h4>
+                <p>{activeSummary.takeaway || "-"}</p>
+                <h4>{activeSummary.labels.actions}</h4>
+                <ul>
+                  {(activeSummary.followUps.length ? activeSummary.followUps : [activeSummary.labels.noActions]).map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+                <button className="secondary wide" onClick={() => downloadConversation(activeConversation, language)}>
+                  <Download size={16} /> {translate("Download conversation", language)}
+                </button>
+              </div>
+            )}
+          </aside>
+        )}
+        <div className="chat-shell">
+          <div className="chat-head">
+            <div className="bot-avatar">
+              <Bot />
+            </div>
+            <div>
+              <h3>Care Assistant</h3>
+              <p>
+                <span /> Powered by GPT-OSS 20B
+              </p>
+            </div>
+            <button
+              className="icon-button"
+              onClick={startNewConversation}
+              aria-label="New conversation"
+            >
+              +
+            </button>
           </div>
-          <div>
-            <h3>Care Assistant</h3>
-            <p>
-              <span /> Powered by GPT-OSS 20B
-            </p>
-          </div>
-          <button
-            className="icon-button"
-            onClick={() => setMessages(initial)}
-            aria-label="New conversation"
-          >
-            +
-          </button>
-        </div>
-        <div className="chat-body">
-          {messages.map((m) => (
-            <div className={`message-row ${m.role}`} key={m.id}>
-              {m.role === "assistant" && (
+          <div className="chat-body">
+            {messages.map((m) => (
+              <div className={`message-row ${m.role}`} key={m.id}>
+                {m.role === "assistant" && (
+                  <div className="mini-bot">
+                    <Sparkles />
+                  </div>
+                )}
+                <div>
+                  <div className="bubble">
+                    {m.role === "assistant" ? (
+                      <AssistantResponse content={m.content} />
+                    ) : (
+                      formatAssistantText(m.content)
+                    )}
+                  </div>
+                  <time>{m.time}</time>
+                </div>
+              </div>
+            ))}
+            {typing && (
+              <div className="message-row assistant">
                 <div className="mini-bot">
                   <Sparkles />
                 </div>
-              )}
-              <div>
-                <div className="bubble">
-                  {m.role === "assistant" ? (
-                    <AssistantResponse content={m.content} />
-                  ) : (
-                    formatAssistantText(m.content)
-                  )}
+                <div className="bubble typing">
+                  <i />
+                  <i />
+                  <i />
                 </div>
-                <time>{m.time}</time>
               </div>
-            </div>
-          ))}
-          {typing && (
-            <div className="message-row assistant">
-              <div className="mini-bot">
-                <Sparkles />
-              </div>
-              <div className="bubble typing">
-                <i />
-                <i />
-                <i />
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="suggestions" aria-label="Suggested questions">
-          {starters.map((s) => (
-            <button
-              key={s}
-              onClick={() => send(translate(s, language))}
-              disabled={typing}
-            >
-              {translate(s, language)}
-            </button>
-          ))}
-        </div>
-        <form
-          className="chat-input"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send();
-          }}
-        >
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Ask about your health records…"
-            aria-label="Message"
-            disabled={typing}
-          />
-          <button
-            type="submit"
-            aria-label="Send message"
-            disabled={typing || !text.trim()}
+            )}
+          </div>
+          <div className="suggestions" aria-label="Suggested questions">
+            {starters.map((s) => (
+              <button
+                key={s}
+                onClick={() => send(translate(s, language))}
+                disabled={typing}
+              >
+                {translate(s, language)}
+              </button>
+            ))}
+          </div>
+          <form
+            className="chat-input"
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
           >
-            <Send />
-          </button>
-        </form>
-        <p className="chat-disclaimer">
-          AI can make mistakes. Check important information with your care team.
-        </p>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={translate("Ask about your health records…", language)}
+              aria-label={translate("Message", language)}
+              disabled={typing}
+            />
+            <button
+              type="submit"
+              aria-label="Send message"
+              disabled={typing || !text.trim()}
+            >
+              <Send />
+            </button>
+          </form>
+          <p className="chat-disclaimer">
+            AI can make mistakes. Check important information with your care team.
+          </p>
+        </div>
       </div>
     </>
   );

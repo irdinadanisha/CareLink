@@ -1,8 +1,6 @@
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
-import type { BloodTestPanel, BloodTestResult, CareLinkPatientData, ClinicalNote, PatientRecordData, PatientProfile } from "@/src/types";
+import type { CareLinkPatientData, PatientRecordData, PatientProfile } from "@/src/types";
 import { clearOfflineSession, loadOfflineSession, saveOfflineSession } from "@/src/services/offlineStore";
-import { listBloodTestPanels } from "@/src/services/bloodTestService";
-import { listClinicalNotes } from "@/src/services/clinicalNotesService";
 
 type PatientRow = {
   record_date: string;
@@ -45,138 +43,20 @@ function toProfile(row: ProfileRow): PatientProfile {
   };
 }
 
-function numericResult(tests: BloodTestResult[], name: string) {
-  const found = tests.find((test) => test.name.toLowerCase() === name.toLowerCase());
-  if (!found) return undefined;
-  const parsed = Number.parseFloat(String(found.value).replace(/[^\d.-]/g, ""));
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function toMgDl(value: number | undefined, unit?: string) {
-  if (!Number.isFinite(value)) return undefined;
-  return /mmol/i.test(unit ?? "") ? Math.round(Number(value) * 18 * 10) / 10 : value;
-}
-
-function monthLabel(date: string) {
-  return new Intl.DateTimeFormat("en-MY", { month: "short" }).format(new Date(`${date}T00:00:00`));
-}
-
-function attachPanelTrends(tests: BloodTestResult[], panels: BloodTestPanel[]) {
-  return tests.map((test) => {
-    const trend = panels
-      .slice()
-      .reverse()
-      .map((panel) => {
-        const point = panel.tests.find((candidate) => candidate.name === test.name);
-        const value = point ? numericResult([point], point.name) : undefined;
-        return Number.isFinite(value) ? { month: monthLabel(panel.date), value: Number(value) } : null;
-      })
-      .filter(Boolean) as { month: string; value: number }[];
-    return trend.length ? { ...test, date: test.date || panels[0]?.date || "", trend } : test;
-  });
-}
-
-function latestDate(dates: string[]) {
-  return dates.filter(Boolean).sort((a, b) => b.localeCompare(a))[0];
-}
-
-function definedNumbers(input: Record<string, number | undefined>) {
-  return Object.fromEntries(
-    Object.entries(input).filter(([, value]) => Number.isFinite(value)),
-  ) as Record<string, number>;
-}
-
-function deriveRecord(
-  base: PatientRecordData,
-  baseDate: string,
-  profile: PatientProfile,
-  panels: BloodTestPanel[],
-  notes: ClinicalNote[],
-) {
-  const basePanel: BloodTestPanel = {
-    id: "patient-record",
-    date: baseDate,
-    doctorName: base.appointments[0]?.doctor,
-    tests: base.bloodTests,
-  };
-  const allPanels = [...panels, basePanel].sort((a, b) => b.date.localeCompare(a.date));
-  const latestPanel = allPanels[0];
-  const latestNote = notes[0];
-  const latestTests = attachPanelTrends(latestPanel.tests, allPanels);
-  const egfr = numericResult(latestTests, "eGFR");
-  const medication = latestPanel.medication || base.medication;
-  const clinicalSummary = latestNote?.summary.sections.length ? latestNote.summary : base.clinicalSummary;
-  const appointmentDoctor = latestNote?.doctorName || latestPanel.doctorName || base.appointments[0]?.doctor || "Your clinician";
-  const appointments = base.appointments.length
-    ? [{ ...base.appointments[0], doctor: appointmentDoctor }]
-    : [{ type: "Diabetes follow-up", doctor: appointmentDoctor, date: "", time: "" }];
-
-  const record: PatientRecordData = {
-    ...base,
-    medication,
-    bloodPressure: latestPanel.systolicBp && latestPanel.diastolicBp
-      ? `${latestPanel.systolicBp}/${latestPanel.diastolicBp}`
-      : base.bloodPressure,
-    kidneyFunction: Number.isFinite(egfr) ? Number(egfr) : base.kidneyFunction,
-    bloodTests: latestTests,
-    trendData: latestTests.find((test) => test.name === "HbA1c")?.trend ?? base.trendData,
-    clinicalSummary,
-    appointments,
-  };
-
-  const hba1c = numericResult(latestTests, "HbA1c");
-  const fasting = latestTests.find((test) => test.name === "Fasting blood glucose");
-  const fps = toMgDl(fasting ? numericResult([fasting], fasting.name) : undefined, fasting?.unit);
-  const bloodPressure = record.bloodPressure.match(/(\d+(?:\.\d+)?)\D+(\d+(?:\.\d+)?)/);
-  const sp = latestPanel.systolicBp ?? (bloodPressure ? Number(bloodPressure[1]) : undefined);
-  const bp = latestPanel.diastolicBp ?? (bloodPressure ? Number(bloodPressure[2]) : undefined);
-  const onsetAge = Number.isFinite(profile.age) ? Number(profile.age) - profile.diabetesDurationYears : undefined;
-  const sharedInput = definedNumbers({
-    AGE: profile.age,
-    BMI: latestPanel.bmi,
-    SP: sp,
-    BP: bp,
-    HbA1c: hba1c,
-    FPS: fps,
-    "ONSET AGE": onsetAge,
-    "MED USE": medication ? 1 : undefined,
-    ...latestPanel.modelInput,
-  });
-
-  return {
-    record,
-    recordDate: latestDate([latestPanel.date, latestNote?.date ?? "", baseDate]) ?? baseDate,
-    modelInput: sharedInput,
-    allPanels,
-  };
-}
-
 export async function loadPatientData(userId: string): Promise<CareLinkPatientData> {
   const supabase = getSupabaseBrowserClient();
-  const [profileResult, recordResult, panelsResult, notesResult] = await Promise.all([
+  const [profileResult, recordResult] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", userId).single<ProfileRow>(),
     supabase.from("patient_records").select("*").eq("user_id", userId).single<PatientRow>(),
-    listBloodTestPanels(userId).catch(() => []),
-    listClinicalNotes(userId).catch(() => []),
   ]);
   if (profileResult.error) throw new Error(profileResult.error.message);
   if (recordResult.error) throw new Error(recordResult.error.message);
-  const profile = toProfile(profileResult.data);
-  const derived = deriveRecord(
-    recordResult.data.record_data,
-    recordResult.data.record_date,
-    profile,
-    panelsResult,
-    notesResult,
-  );
   return {
-    profile,
-    recordDate: derived.recordDate,
-    record: derived.record,
-    nephropathyInput: { ...recordResult.data.nephropathy_input, ...derived.modelInput },
-    neuropathyInput: { ...recordResult.data.neuropathy_input, ...derived.modelInput },
-    testPanels: derived.allPanels,
-    clinicalNotes: notesResult,
+    profile: toProfile(profileResult.data),
+    recordDate: recordResult.data.record_date,
+    record: recordResult.data.record_data,
+    nephropathyInput: recordResult.data.nephropathy_input,
+    neuropathyInput: recordResult.data.neuropathy_input,
   };
 }
 

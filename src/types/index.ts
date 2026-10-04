@@ -5,15 +5,6 @@ export interface ChatConversation { id:string; title:string; language:"en"|"ms"|
 export interface BloodTestResult { name:string; value:string; unit:string; range:string; status:string; date:string; category:string; explanation:string; trend:{month:string;value:number}[]; }
 export interface NephropathyPredictionResult { probability:number; category:string; explanation:string; factors:string[]; }
 export interface ClinicalSummary { sections:{title:string;text:string;items?:string[]}[] }
-export interface BloodTestPanel {
-  id:string; date:string; doctorName?:string; notes?:string; tests:BloodTestResult[];
-  systolicBp?:number; diastolicBp?:number; bmi?:number; medication?:string;
-  modelInput?:Record<string,number|undefined>; createdAt?:string;
-}
-export interface ClinicalNote {
-  id:string; date:string; doctorName?:string; title:string; rawText:string;
-  summary:ClinicalSummary; createdAt?:string;
-}
 export interface PatientProfile {
   id:string; patientId:string; fullName:string; email:string; dateOfBirth:string; age?:number;
   diabetesType:string; diabetesDurationYears:number; preferredLanguage:"en"|"ms"|"zh"|"ta";
@@ -28,6 +19,4 @@ export interface CareLinkPatientData {
   profile:PatientProfile; recordDate:string; record:PatientRecordData;
   nephropathyInput:Record<string,number|undefined>;
   neuropathyInput:Record<string,number|undefined>;
-  testPanels?:BloodTestPanel[];
-  clinicalNotes?:ClinicalNote[];
 }

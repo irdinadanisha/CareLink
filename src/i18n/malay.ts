@@ -1173,14 +1173,16 @@ export function isLanguage(value: string | null): value is Language {
   return value === "en" || value === "ms" || value === "zh" || value === "ta";
 }
 
-export function translateToMalay(value: string) {
+export function translateToMalay(value: string | null | undefined) {
   return translate(value, "ms");
 }
 
-export function translate(value: string, language: Language) {
-  const trimmed = value.trim();
-  if (!trimmed) return value;
-  if (language === "en") return value;
+export function translate(value: string | number | null | undefined, language: Language) {
+  if (value === null || value === undefined) return "";
+  const text = String(value);
+  const trimmed = text.trim();
+  if (!trimmed) return text;
+  if (language === "en") return text;
   let translated = dictionaries[language][trimmed];
   if (!translated) {
     translated = fallbacks[language].reduce(
@@ -1188,8 +1190,8 @@ export function translate(value: string, language: Language) {
       trimmed,
     );
   }
-  const start = value.match(/^\s*/)?.[0] ?? "";
-  const end = value.match(/\s*$/)?.[0] ?? "";
+  const start = text.match(/^\s*/)?.[0] ?? "";
+  const end = text.match(/\s*$/)?.[0] ?? "";
   return `${start}${translated}${end}`;
 }
 

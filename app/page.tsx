@@ -163,15 +163,16 @@ function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const tone = /good|stable|low|normal/i.test(status)
+  const label = status || "Unknown";
+  const tone = /good|stable|low|normal/i.test(label)
     ? "good"
-    : /high|attention|above/i.test(status)
+    : /high|attention|above/i.test(label)
       ? "warn"
       : "info";
   return (
     <span className={`badge ${tone}`}>
       <span aria-hidden="true">●</span>
-      {status}
+      {label}
     </span>
   );
 }
@@ -1053,6 +1054,7 @@ function PossibleRisksPage({ data, language }: { data: CareLinkPatientData; lang
 
 function ResultsPage({ data, language }: { data: CareLinkPatientData; language: Language }) {
   const bloodTests = data.record.bloodTests;
+  const recordDate = displayDate(data.recordDate);
   const [filter, setFilter] = useState("Latest results"),
     [selectedName, setSelectedName] = useState(bloodTests[0]?.name ?? "");
   const visible = bloodTests.filter((t) =>
@@ -1122,7 +1124,7 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
               <span>
                 <StatusBadge status={t.status} />
               </span>
-              <span>{translate(t.date, language)}</span>
+              <span>{translate(t.date ?? recordDate, language)}</span>
             </button>
           ))}
         </div>

@@ -704,7 +704,7 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
     <>
       <div className="page-intro">
         <div>
-          <p className="eyebrow">GROQ · LLAMA 3.3 70B</p>
+          <p className="eyebrow">GROQ · GPT-OSS 20B</p>
           <h2>AI Health Assistant</h2>
           <p>Ask questions about your diabetes, results, and care plan.</p>
         </div>
@@ -724,7 +724,7 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
           <div>
             <h3>Care Assistant</h3>
             <p>
-              <span /> Powered by Llama 3.3 70B
+              <span /> Powered by GPT-OSS 20B
             </p>
           </div>
           <button

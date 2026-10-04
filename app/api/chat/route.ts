@@ -2,7 +2,7 @@ import Groq from "groq-sdk";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "openai/gpt-oss-20b";
 const MAX_MESSAGES = 12;
 const MAX_MESSAGE_LENGTH = 4_000;
 const SYSTEM_PROMPT = `You are CareLink's patient-facing diabetes health assistant.

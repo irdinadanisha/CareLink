@@ -1,6 +1,8 @@
 # CareLink
 
-CareLink is an offline-capable, multilingual patient health portal designed for people managing diabetes in Malaysia. It brings health summaries, test results, risk estimates, wound monitoring, chat history, and an AI health assistant into one calm, patient-friendly experience.
+CareLink is an offline-capable, multilingual diabetes care platform for Malaysia. This repository now contains both the patient portal and the doctor portal so judges can review the full workflow from one GitHub submission.
+
+The patient portal brings health summaries, test results, risk estimates, wound monitoring, chat history, and an AI health assistant into one calm, patient-friendly experience. The doctor portal lets clinicians review patients, update blood-test results and clinical notes, and manage follow-up data in the same Supabase project.
 
 The project is built for real-world constraints: patients may have only a phone, intermittent 3G connectivity, and limited access to clinic systems. CareLink keeps essential records and actions available locally, then synchronizes changes when connectivity returns.
 
@@ -17,12 +19,28 @@ The project is built for real-world constraints: patients may have only a phone,
 - 📷 Wound health checks with local image storage and symptom-based follow-up guidance
 - 🔐 Offline PIN unlock, shared-device timeout, and doctor-triggered session revocation
 - 🗂️ Conversation history with deterministic summaries and text downloads
+- 🩺 Doctor portal included in `doctor-portal/` for clinician-side updates
 
 ## Why CareLink?
 
 Many health portals assume reliable internet access and clinical terminology that patients already understand. CareLink is designed around a different reality: a patient should be able to open her record, understand a result, save a wound photograph, and ask a focused question even when the connection is weak or unavailable.
 
 The portal supports clinicians without presenting itself as a replacement for them. Risk percentages are clearly labelled as model estimates, AI responses are educational, and urgent symptoms are directed to professional or emergency care.
+
+## Repository Layout
+
+```text
+.
+├─ app/                       Patient portal Next.js app
+├─ src/                       Patient portal services, models, types, and translations
+├─ supabase/migrations/       Patient portal database migrations
+├─ doctor-portal/             Doctor dashboard Next.js app
+│  ├─ app/doctor/             Doctor-facing dashboard route
+│  ├─ app/api/                Doctor portal API routes
+│  ├─ src/                    Doctor portal services and data access
+│  └─ supabase/migrations/    Doctor portal schema and policy migrations
+└─ README.md                  Combined submission guide
+```
 
 ## Main Workflows
 
@@ -76,6 +94,8 @@ A doctor portal can revoke a patient’s CareLink app session through the protec
 
 ### Install and run
 
+Patient portal:
+
 ```bash
 npm install
 npm run dev
@@ -83,9 +103,25 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+Doctor portal:
+
+```bash
+cd doctor-portal
+npm install
+npm run dev
+```
+
+Open [http://localhost:3001](http://localhost:3001). The doctor app redirects its root route to `/doctor`.
+
+From the repository root, after installing the doctor portal dependencies once, you can also run:
+
+```bash
+npm run dev:doctor
+```
+
 ### Environment variables
 
-Create `.env.local` with the public Supabase settings and the server-side Groq key:
+Create `.env.local` in the patient portal root and another `.env.local` inside `doctor-portal/`. Both apps use the same Supabase project values:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -98,7 +134,7 @@ Never expose `SUPABASE_SECRET_KEY` or `GROQ_API_KEY` to the browser. Variables b
 
 ### Database setup
 
-Run the SQL migrations in `supabase/migrations/` against the project’s Supabase database. They create the patient records, wound checks, chat history, delete policies, and session-revocation marker used by the application.
+Run the SQL migrations in `supabase/migrations/` and `doctor-portal/supabase/migrations/` against the same Supabase database. They create the patient records, wound checks, chat history, delete policies, doctor access policies, audit logging, and the session-revocation marker used by the application.
 
 The session-revocation migration is:
 
@@ -106,11 +142,26 @@ The session-revocation migration is:
 supabase/migrations/202610040004_add_session_revocation.sql
 ```
 
+The doctor portal also includes `doctor-portal/supabase/seed.sql` for demo data from the imported clinical dashboard.
+
+### Vercel deployment
+
+Use one GitHub repository with two Vercel projects:
+
+```text
+Patient portal root directory: .
+Doctor portal root directory: doctor-portal
+```
+
+Both Vercel projects should receive the same Supabase environment variables. The patient project also needs the AI/server keys used by its assistant and protected doctor-session endpoint.
+
 ## Testing and Verification
 
 ```bash
 npm run lint
 npm run build
+npm run lint:doctor
+npm run build:doctor
 ```
 
 The build verifies the Next.js production bundle and the server routes, including the doctor session-revocation endpoint.

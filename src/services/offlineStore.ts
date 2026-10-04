@@ -11,6 +11,8 @@ type StoredPatientSession = {
   userId: string;
   accessToken: string;
   patient: CareLinkPatientData;
+  sessionStartedAt: string;
+  personalDevice?: boolean;
   savedAt: string;
 };
 
@@ -177,4 +179,29 @@ export async function markOfflineFootCheckSynced(id: string, imageUrl = "") {
 export async function deleteOfflineFootCheck(id: string) {
   if (typeof indexedDB === "undefined") return;
   await withStore(FOOT_CHECK_STORE, "readwrite", (store) => store.delete(id));
+}
+
+export async function clearOfflineFootChecks(userId: string) {
+  if (typeof indexedDB === "undefined") return;
+  const database = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(FOOT_CHECK_STORE, "readwrite");
+    const request = transaction.objectStore(FOOT_CHECK_STORE).index("userId").openCursor(IDBKeyRange.only(userId));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+      }
+    };
+    request.onerror = () => reject(request.error ?? new Error("CareLink offline records could not clear."));
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error ?? new Error("CareLink offline records could not clear."));
+    };
+  });
 }

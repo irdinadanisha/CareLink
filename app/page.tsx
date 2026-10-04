@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Activity,
   Bell,
@@ -77,6 +77,18 @@ import {
   mergeChatConversations,
   syncCloudChatConversations,
 } from "@/src/services/chatHistoryService";
+import {
+  createPin,
+  hasPin,
+  isDeviceActivityExpired,
+  isPinUnlocked,
+  loadDeviceMode,
+  lockPinForThisSession,
+  saveDeviceMode,
+  touchDeviceActivity,
+  unlockPinForThisSession,
+  verifyPin,
+} from "@/src/services/deviceSecurityService";
 
 const initials = (name: string) =>
   name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
@@ -399,13 +411,14 @@ function Login({
   language,
   onLanguageChange,
 }: {
-  onLogin: (email: string, password: string) => Promise<void>;
+  onLogin: (email: string, password: string, personalDevice: boolean) => Promise<void>;
   language: Language;
   onLanguageChange: (language: Language) => void;
 }) {
   const [show, setShow] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [personalDevice, setPersonalDevice] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   return (
@@ -460,7 +473,7 @@ function Login({
           onSubmit={async (e) => {
             e.preventDefault();
             setSubmitting(true); setError("");
-            try { await onLogin(email, password); }
+            try { await onLogin(email, password, personalDevice); }
             catch (cause) { setError(cause instanceof Error ? cause.message : "Sign in failed."); }
             finally { setSubmitting(false); }
           }}
@@ -499,7 +512,7 @@ function Login({
           </label>
           <div className="form-row">
             <label className="check">
-              <input type="checkbox" defaultChecked /> Remember me
+              <input type="checkbox" checked={personalDevice} onChange={(event) => setPersonalDevice(event.target.checked)} /> Personal device
             </label>
             <button className="link" type="button">
               Forgot password?
@@ -516,6 +529,95 @@ function Login({
             </button>
           </p>
         </form>
+      </section>
+    </main>
+  );
+}
+
+function PinGate({
+  userId,
+  language,
+  onUnlocked,
+  onLogout,
+}: {
+  userId: string;
+  language: Language;
+  onUnlocked: () => void;
+  onLogout: () => Promise<void>;
+}) {
+  const existingPin = hasPin(userId);
+  const [pin, setPin] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setSaving(true);
+    try {
+      if (existingPin) {
+        if (!(await verifyPin(userId, pin))) throw new Error(translate("That PIN is incorrect.", language));
+      } else {
+        if (pin !== confirmation) throw new Error(translate("The PINs do not match.", language));
+        await createPin(userId, pin);
+      }
+      unlockPinForThisSession(userId);
+      onUnlocked();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : translate("The PIN could not be saved.", language));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <main className="pin-gate-page">
+      <section className="pin-gate card">
+        <span className="hero-icon"><ShieldCheck /></span>
+        <p className="eyebrow">{translate("OFFLINE RECORDS LOCKED", language)}</p>
+        <h1>{translate(existingPin ? "Enter your CareLink PIN" : "Create an offline PIN", language)}</h1>
+        <p>{translate(existingPin
+          ? "Enter your PIN to open your saved health records on this device."
+          : "This PIN protects your saved health records when you return to CareLink.", language)}</p>
+        <form onSubmit={submit}>
+          <label>
+            {translate("PIN", language)}
+            <input
+              value={pin}
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 8))}
+              inputMode="numeric"
+              pattern="[0-9]{4,8}"
+              minLength={4}
+              maxLength={8}
+              autoFocus
+              type="password"
+              required
+            />
+          </label>
+          {!existingPin && (
+            <label>
+              {translate("Confirm PIN", language)}
+              <input
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value.replace(/\D/g, "").slice(0, 8))}
+                inputMode="numeric"
+                pattern="[0-9]{4,8}"
+                minLength={4}
+                maxLength={8}
+                type="password"
+                required
+              />
+            </label>
+          )}
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="primary wide" type="submit" disabled={saving}>
+            {saving ? translate("Checking…", language) : translate(existingPin ? "Unlock records" : "Save PIN", language)}
+          </button>
+        </form>
+        <button className="link pin-logout" type="button" onClick={() => void onLogout()}>
+          {translate("Sign out", language)}
+        </button>
       </section>
     </main>
   );
@@ -1889,7 +1991,9 @@ function SettingsPage({ largeText, darkMode, onLargeText, onDarkMode, logout }: 
 export default function HomePage() {
   const [patientData, setPatientData] = useState<CareLinkPatientData | null>(null),
     [accessToken, setAccessToken] = useState(""),
+    [sessionStartedAt, setSessionStartedAt] = useState(""),
     [sessionSource, setSessionSource] = useState<"online" | "offline">("online"),
+    [pinLocked, setPinLocked] = useState(false),
     [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine),
     [pendingSync, setPendingSync] = useState(false),
     [authLoading, setAuthLoading] = useState(true),
@@ -1917,7 +2021,9 @@ export default function HomePage() {
         if (active && session) {
           setPatientData(session.patient);
           setAccessToken(session.accessToken);
+          setSessionStartedAt(session.sessionStartedAt);
           setSessionSource(session.source);
+          setPinLocked(!isPinUnlocked(session.userId));
         }
       })
       .catch(() => undefined)
@@ -1940,7 +2046,15 @@ export default function HomePage() {
       const result = await syncPendingFootChecks(patientId).catch(() => ({ pending: true, synced: 0 }));
       if (!cancelled) setPendingSync(Boolean(result.pending));
       if (accessToken) {
-        const refreshed = await refreshPatientCache(patientId, accessToken).catch(() => null);
+        const refreshed = await refreshPatientCache(patientId, accessToken, sessionStartedAt).catch((cause) => {
+          if (cause instanceof Error && cause.message === "SESSION_REVOKED") {
+            setPatientData(null);
+            setAccessToken("");
+            setSessionStartedAt("");
+            setSessionSource("online");
+          }
+          return null;
+        });
         if (!cancelled && refreshed) {
           setPatientData(refreshed.patient);
           setSessionSource("online");
@@ -1953,7 +2067,49 @@ export default function HomePage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [accessToken, online, patientId]);
+  }, [accessToken, online, patientId, sessionStartedAt]);
+  useEffect(() => {
+    if (!patientId) return;
+    const idleTimeout = 30 * 60 * 1000;
+    const enforceIdleTimeout = () => {
+      if (loadDeviceMode() !== "shared") return;
+      if (isDeviceActivityExpired(patientId, idleTimeout)) {
+        lockPinForThisSession(patientId);
+        void signOutPatient().finally(() => {
+          setPatientData(null);
+          setAccessToken("");
+          setSessionStartedAt("");
+          setSessionSource("online");
+          setPage("dashboard");
+        });
+      }
+    };
+    const recordActivity = () => touchDeviceActivity(patientId);
+    const events = ["pointerdown", "keydown", "touchstart", "scroll"] as const;
+    events.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }));
+    recordActivity();
+    const interval = window.setInterval(enforceIdleTimeout, 15_000);
+    enforceIdleTimeout();
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, recordActivity));
+      window.clearInterval(interval);
+    };
+  }, [patientId]);
+  useEffect(() => {
+    if (!patientId) return;
+    const lockWhenHidden = () => {
+      if (document.visibilityState === "hidden") {
+        lockPinForThisSession(patientId);
+        setPinLocked(true);
+      }
+    };
+    document.addEventListener("visibilitychange", lockWhenHidden);
+    window.addEventListener("pagehide", lockWhenHidden);
+    return () => {
+      document.removeEventListener("visibilitychange", lockWhenHidden);
+      window.removeEventListener("pagehide", lockWhenHidden);
+    };
+  }, [patientId]);
   useEffect(() => applyLanguage(language), [language, page, patientData]);
   useEffect(() => {
     document.documentElement.classList.toggle("large-text-mode", largeText);
@@ -1998,13 +2154,25 @@ export default function HomePage() {
     () => page === "settings" ? "Settings" : nav.find((x) => x.id === page)?.label || "Home",
     [page],
   );
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, personalDevice: boolean) => {
     const session = await signInPatient(email, password);
+    saveDeviceMode(personalDevice);
+    touchDeviceActivity(session.userId);
     setPatientData(session.patient);
     setAccessToken(session.accessToken);
+    setSessionStartedAt(session.sessionStartedAt);
     setSessionSource(session.source);
+    setPinLocked(true);
   };
-  const logout = async () => { await signOutPatient(); setPatientData(null); setAccessToken(""); setSessionSource("online"); setPage("dashboard"); };
+  const logout = async () => {
+    if (patientId) lockPinForThisSession(patientId);
+    await signOutPatient();
+    setPatientData(null);
+    setAccessToken("");
+    setSessionStartedAt("");
+    setSessionSource("online");
+    setPage("dashboard");
+  };
   const toggleLargeText = () => setLargeText((current) => {
     const next = !current; window.localStorage.setItem("carelink-large-text", String(next)); return next;
   });
@@ -2013,6 +2181,7 @@ export default function HomePage() {
   });
   if (authLoading) return <main className="login-page"><section className="login-side"><Brand /></section><section className="login-panel"><p>Loading your secure patient portal…</p></section></main>;
   if (!patientData) return <Login onLogin={login} language={language} onLanguageChange={changeLanguage} />;
+  if (pinLocked) return <PinGate userId={patientData.profile.id} language={language} onUnlocked={() => { unlockPinForThisSession(patientData.profile.id); touchDeviceActivity(patientData.profile.id); setPinLocked(false); }} onLogout={logout} />;
   const go = (p: Page) => {
     setPage(p);
     setMenu(false);

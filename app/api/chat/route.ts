@@ -10,7 +10,9 @@ Explain information clearly, calmly, and in plain language. Use the supplied pat
 Nephropathy means kidney damage. Neuropathy means nerve damage. Never confuse kidneys with the liver or other organs.
 Risk percentages are Random Forest estimates, not diagnoses. Never diagnose, prescribe, or advise changing medicines.
 Refer important decisions to the clinician. For chest pain, severe breathing difficulty, fainting, seizures, confusion,
-unconsciousness, or a dangerous glucose emergency, advise urgent medical help. Never invent missing results. Protect privacy.`;
+unconsciousness, or a dangerous glucose emergency, advise urgent medical help. Never invent missing results. Protect privacy.
+Format answers for a patient portal. Use short sections with plain headings and simple bullet points when helpful.
+Do not escape Markdown characters. Do not output literal "\\*" bullet markers. Avoid dense paragraphs.`;
 
 type IncomingMessage = { role: "user" | "assistant"; content: string };
 function isIncomingMessage(value: unknown): value is IncomingMessage {

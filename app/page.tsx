@@ -72,6 +72,13 @@ const displayDate = (date: string) =>
     new Date(`${date}T00:00:00`),
   );
 
+const formatAssistantText = (value: string) =>
+  value
+    .replace(/\\\*/g, "•")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/(?:^|\s)•\s+/g, "\n• ")
+    .trim();
+
 const nav = [
   { id: "dashboard", label: "Home", icon: Home },
   { id: "summary", label: "Health Summary", icon: ClipboardList },
@@ -744,7 +751,7 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
                 </div>
               )}
               <div>
-                <div className="bubble">{m.content}</div>
+                <div className="bubble">{formatAssistantText(m.content)}</div>
                 <time>{m.time}</time>
               </div>
             </div>

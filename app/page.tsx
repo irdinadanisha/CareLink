@@ -89,6 +89,19 @@ const normalizeTrendData = (
         },
   );
 
+const languageLocale: Record<Language, string> = {
+  en: "en-MY",
+  ms: "ms-MY",
+  zh: "zh-MY",
+  ta: "ta-MY",
+};
+
+const displayDateTime = (date: string, language: Language) =>
+  new Intl.DateTimeFormat(languageLocale[language], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(date));
+
 const formatAssistantText = (value: string) =>
   value
     .replace(/\\\*/g, "•")
@@ -1166,7 +1179,7 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
 
 type FootAnswers = { redness: boolean | null; swelling: boolean | null; warmth: boolean | null };
 
-function FootHealthPage({ userId }: { userId: string }) {
+function FootHealthPage({ userId, language }: { userId: string; language: Language }) {
   const [answers, setAnswers] = useState<FootAnswers>({ redness: null, swelling: null, warmth: null });
   const [image, setImage] = useState<File | null>(null);
   const [history, setHistory] = useState<FootCheckRecord[]>([]);
@@ -1267,52 +1280,52 @@ function FootHealthPage({ userId }: { userId: string }) {
     { key: "warmth", title: "Does the area feel unusually warm?", hint: "Compare it gently with nearby unaffected skin or the same area on the other side of your body. A photo cannot measure warmth." },
   ];
   return <>
-    <div className="page-intro"><div><p className="eyebrow">SKIN & WOUND MONITORING</p><h2>Wound Health Check</h2><p>Record warning signs around a wound or affected skin area and save a photograph for your care history.</p></div></div>
-    <Notice kind="warning">This checklist does not analyse or diagnose the photograph. If you have an open wound, pus, fever, black or blue skin, rapidly spreading redness, or severe swelling, seek urgent medical help.</Notice>
+    <div className="page-intro"><div><p className="eyebrow">{translate("SKIN & WOUND MONITORING", language)}</p><h2>{translate("Wound Health Check", language)}</h2><p>{translate("Record warning signs around a wound or affected skin area and save a photograph for your care history.", language)}</p></div></div>
+    <Notice kind="warning">{translate("This checklist does not analyse or diagnose the photograph. If you have an open wound, pus, fever, black or blue skin, rapidly spreading redness, or severe swelling, seek urgent medical help.", language)}</Notice>
     <div className="foot-check-layout">
       <section className="card foot-check-form">
-        <div className="foot-step"><span>1</span><div><h3>Check for warning signs</h3><p>Answer all three questions before adding a photograph.</p></div></div>
+        <div className="foot-step"><span>1</span><div><h3>{translate("Check for warning signs", language)}</h3><p>{translate("Answer all three questions before adding a photograph.", language)}</p></div></div>
         <div className="foot-questions">
           {questions.map((question) => <article key={question.key} className="foot-question">
-            <div><h4>{question.title}</h4><p>{question.hint}</p></div>
-            <div className="yes-no" role="group" aria-label={question.title}>
-              {[false, true].map((value) => <button key={String(value)} className={answers[question.key] === value ? "selected" : ""} onClick={() => setAnswers((current) => ({ ...current, [question.key]: value }))}>{value ? "Yes" : "No"}</button>)}
+            <div><h4>{translate(question.title, language)}</h4><p>{translate(question.hint, language)}</p></div>
+            <div className="yes-no" role="group" aria-label={translate(question.title, language)}>
+              {[false, true].map((value) => <button key={String(value)} className={answers[question.key] === value ? "selected" : ""} onClick={() => setAnswers((current) => ({ ...current, [question.key]: value }))}>{translate(value ? "Yes" : "No", language)}</button>)}
             </div>
           </article>)}
         </div>
         {answered && <>
-          <div className="foot-step second"><span>2</span><div><h3>Add a current photograph</h3><p>Use good lighting and show the wound or affected area together with some surrounding skin. JPEG, PNG, or WebP; maximum 8 MB.</p></div></div>
+          <div className="foot-step second"><span>2</span><div><h3>{translate("Add a current photograph", language)}</h3><p>{translate("Use good lighting and show the wound or affected area together with some surrounding skin. JPEG, PNG, or WebP; maximum 8 MB.", language)}</p></div></div>
           <div className="image-actions">
-            <button type="button" className="primary" onClick={() => setCameraOpen(true)}><Camera size={18} /> Use camera</button>
-            <label className="secondary"><Upload size={18} /> Upload image<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => chooseImage(event.target.files?.[0])} /></label>
+            <button type="button" className="primary" onClick={() => setCameraOpen(true)}><Camera size={18} /> {translate("Use camera", language)}</button>
+            <label className="secondary"><Upload size={18} /> {translate("Upload image", language)}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => chooseImage(event.target.files?.[0])} /></label>
           </div>
-          {preview && <div className="foot-preview"><img src={preview} alt="Selected wound check" /><span>{image?.name}</span></div>}
+          {preview && <div className="foot-preview"><img src={preview} alt={translate("Selected wound check", language)} /><span>{image?.name}</span></div>}
           {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="primary wide save-foot-check" disabled={!image || submitting} onClick={submit}>{submitting ? "Saving securely…" : "Save wound health check"}</button>
+          <button className="primary wide save-foot-check" disabled={!image || submitting} onClick={submit}>{translate(submitting ? "Saving securely…" : "Save wound health check", language)}</button>
         </>}
       </section>
       <aside className="card foot-history">
-        <p className="eyebrow">YOUR RECORDS</p><h3>Previous checks</h3>
-        {history.length === 0 ? <p>No wound health checks saved yet.</p> : history.map((check) => <article key={check.id}>
-          {check.imageUrl && <img src={check.imageUrl} alt="Previously uploaded wound check" />}
-          <div><strong>{check.symptomCount}/3 signs reported</strong><small>{new Intl.DateTimeFormat("en-MY", { dateStyle: "medium", timeStyle: "short" }).format(new Date(check.createdAt))}</small><span className={check.recommendation === "doctor_attention" ? "attention" : "monitor"}>{check.recommendation === "doctor_attention" ? "Doctor’s attention advised" : "Continue monitoring"}</span></div>
+        <p className="eyebrow">{translate("YOUR RECORDS", language)}</p><h3>{translate("Previous checks", language)}</h3>
+        {history.length === 0 ? <p>{translate("No wound health checks saved yet.", language)}</p> : history.map((check) => <article key={check.id}>
+          {check.imageUrl && <img src={check.imageUrl} alt={translate("Previously uploaded wound check", language)} />}
+          <div><strong>{translate(`${check.symptomCount}/3 signs reported`, language)}</strong><small>{displayDateTime(check.createdAt, language)}</small><span className={check.recommendation === "doctor_attention" ? "attention" : "monitor"}>{translate(check.recommendation === "doctor_attention" ? "Doctor’s attention advised" : "Continue monitoring", language)}</span></div>
         </article>)}
       </aside>
     </div>
     {cameraOpen && <div className="camera-modal" role="dialog" aria-modal="true" aria-labelledby="camera-title">
       <div className="camera-dialog">
-        <div className="camera-head"><div><p className="eyebrow">LIVE CAMERA</p><h2 id="camera-title">Take a current photograph</h2></div><button type="button" className="icon-button" onClick={() => setCameraOpen(false)} aria-label="Close camera"><X /></button></div>
+        <div className="camera-head"><div><p className="eyebrow">{translate("LIVE CAMERA", language)}</p><h2 id="camera-title">{translate("Take a current photograph", language)}</h2></div><button type="button" className="icon-button" onClick={() => setCameraOpen(false)} aria-label={translate("Close camera", language)}><X /></button></div>
         <div className="camera-view"><video ref={videoRef} autoPlay playsInline muted />{cameraError && <p role="alert">{cameraError}</p>}</div>
-        <p className="camera-guidance">Use good lighting and keep the wound or affected area clearly visible.</p>
-        <div className="camera-actions"><button type="button" className="secondary" onClick={() => setCameraOpen(false)}>Cancel</button><button type="button" className="primary" onClick={captureImage} disabled={Boolean(cameraError)}><Camera size={18} /> Capture photograph</button></div>
+        <p className="camera-guidance">{translate("Use good lighting and keep the wound or affected area clearly visible.", language)}</p>
+        <div className="camera-actions"><button type="button" className="secondary" onClick={() => setCameraOpen(false)}>{translate("Cancel", language)}</button><button type="button" className="primary" onClick={captureImage} disabled={Boolean(cameraError)}><Camera size={18} /> {translate("Capture photograph", language)}</button></div>
       </div>
     </div>}
     {result && <div className="result-modal" role="dialog" aria-modal="true" aria-labelledby="foot-result-title"><div className={`result-dialog ${result.recommendation}`}>
       <span className="result-symbol">{result.recommendation === "doctor_attention" ? "!" : "✓"}</span>
-      <h2 id="foot-result-title">{result.recommendation === "doctor_attention" ? "This needs a doctor’s attention" : result.symptomCount === 1 ? "Keep a close eye on the affected area" : "No warning signs reported"}</h2>
-      <p>{result.recommendation === "doctor_attention" ? `You reported ${result.symptomCount} of 3 warning signs. Contact your doctor or diabetes care team promptly for advice.` : result.symptomCount === 1 ? "You reported 1 of 3 warning signs. Monitor the area closely and seek medical help immediately if it worsens or another sign appears." : "Continue checking the wound or affected area and contact your care team if redness, swelling, warmth, discharge, or colour changes develop."}</p>
-      <p className="result-note">Your answers and photograph have been saved privately to your CareLink record. This is not an AI diagnosis.</p>
-      <button className="primary wide" onClick={reset}>Done</button>
+      <h2 id="foot-result-title">{translate(result.recommendation === "doctor_attention" ? "This needs a doctor’s attention" : result.symptomCount === 1 ? "Keep a close eye on the affected area" : "No warning signs reported", language)}</h2>
+      <p>{translate(result.recommendation === "doctor_attention" ? `You reported ${result.symptomCount} of 3 warning signs. Contact your doctor or diabetes care team promptly for advice.` : result.symptomCount === 1 ? "You reported 1 of 3 warning signs. Monitor the area closely and seek medical help immediately if it worsens or another sign appears." : "Continue checking the wound or affected area and contact your care team if redness, swelling, warmth, discharge, or colour changes develop.", language)}</p>
+      <p className="result-note">{translate("Your answers and photograph have been saved privately to your CareLink record. This is not an AI diagnosis.", language)}</p>
+      <button className="primary wide" onClick={reset}>{translate("Done", language)}</button>
     </div></div>}
   </>;
 }
@@ -1577,7 +1590,7 @@ export default function HomePage() {
           {page === "assistant" && <AssistantPage language={language} data={patientData} accessToken={accessToken} />}{" "}
           {page === "ckd" && <PossibleRisksPage data={patientData} language={language} />}{" "}
           {page === "results" && <ResultsPage data={patientData} language={language} />}{" "}
-          {page === "footcheck" && <FootHealthPage userId={patientData.profile.id} />}{" "}
+          {page === "footcheck" && <FootHealthPage userId={patientData.profile.id} language={language} />}{" "}
           {page === "profile" && <ProfilePage language={language} data={patientData} />}
           {page === "settings" && <SettingsPage largeText={largeText} darkMode={darkMode} onLargeText={toggleLargeText} onDarkMode={toggleDarkMode} logout={logout} />}
         </div>

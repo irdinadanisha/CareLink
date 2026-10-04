@@ -148,6 +148,29 @@ const getHba1cTrendSummary = (data: { month: string; value: number }[]) => {
   };
 };
 
+const monthLabelFromDate = (date: string) =>
+  new Intl.DateTimeFormat("en-MY", { month: "short" }).format(new Date(`${date}T00:00:00`));
+
+const getResultTrendData = (
+  test: BloodTestResult,
+  recordTrendData: { month: string; value: number }[],
+  recordDate: string,
+) => {
+  const currentValue = Number(test.value);
+  const baseTrend = test.name === "HbA1c" && recordTrendData.length ? recordTrendData : test.trend;
+  const trend = [...(baseTrend ?? [])].filter((point) => Number.isFinite(point.value));
+  const latest = trend[trend.length - 1];
+
+  if (Number.isFinite(currentValue) && (!latest || Math.abs(latest.value - currentValue) >= 0.05)) {
+    trend.push({
+      month: monthLabelFromDate(recordDate),
+      value: Math.round(currentValue * 10) / 10,
+    });
+  }
+
+  return trend;
+};
+
 const languageLocale: Record<Language, string> = {
   en: "en-MY",
   ms: "ms-MY",
@@ -878,6 +901,13 @@ function Dashboard({ go, data, language }: { go: (p: Page) => void; data: CareLi
 }
 
 function TrendChart({ data }: { data: { month: string; value: number }[] }) {
+  const values = data.map((point) => point.value).filter(Number.isFinite);
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 10;
+  const padding = Math.max((max - min) * 0.2, 0.4);
+  const domainMin = Math.max(0, Math.floor((min - padding) * 10) / 10);
+  const domainMax = Math.ceil((max + padding) * 10) / 10;
+
   return (
     <div className="chart">
       <ResponsiveContainer width="100%" height="100%">
@@ -904,7 +934,7 @@ function TrendChart({ data }: { data: { month: string; value: number }[] }) {
             tick={{ fill: "#647b8d", fontSize: 12 }}
           />
           <YAxis
-            domain={[6.5, 8]}
+            domain={[domainMin, domainMax]}
             axisLine={false}
             tickLine={false}
             tick={{ fill: "#647b8d", fontSize: 12 }}
@@ -1660,6 +1690,9 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
     bloodTests.find((test) => test.name === selectedName) ??
     visible[0] ??
     bloodTests[0];
+  const selectedTrend = selected
+    ? normalizeTrendData(getResultTrendData(selected, data.record.trendData, data.recordDate), language)
+    : [];
 
   return (
     <>
@@ -1731,7 +1764,7 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
             <StatusBadge status={selected.status} />
             <p>{translate(selected.explanation, language)}</p>
             <div className="mini-chart">
-              <TrendChart data={normalizeTrendData(selected.trend, language)} />
+              <TrendChart data={selectedTrend} />
             </div>
             <Notice>
               One result alone does not tell the full story. Your doctor will

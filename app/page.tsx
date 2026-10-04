@@ -70,6 +70,11 @@ import {
 } from "@/src/services/patientDataService";
 import type { CareLinkPatientData } from "@/src/types";
 import { listFootChecks, saveFootCheck, syncPendingFootChecks, type FootCheckRecord } from "@/src/services/footCheckService";
+import {
+  loadCloudChatConversations,
+  mergeChatConversations,
+  syncCloudChatConversations,
+} from "@/src/services/chatHistoryService";
 
 const initials = (name: string) =>
   name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
@@ -881,9 +886,24 @@ const offlineStarterTopics: Record<string, "hba1c" | "kidney" | "food" | "doctor
   "Explain my latest health summary": "summary",
   "What are symptoms of low blood sugar?": "low",
 };
-function AssistantPage({ language, data, accessToken, online }: { language: Language; data: CareLinkPatientData; accessToken: string; online: boolean }) {
+const sameConversationList = (left: ChatConversation[], right: ChatConversation[]) =>
+  JSON.stringify(left) === JSON.stringify(right);
+function AssistantPage({
+  language,
+  data,
+  accessToken,
+  online,
+  onSyncPendingChange,
+}: {
+  language: Language;
+  data: CareLinkPatientData;
+  accessToken: string;
+  online: boolean;
+  onSyncPendingChange: (pending: boolean) => void;
+}) {
   const firstName = data.profile.fullName.split(" ")[0];
   const storageKey = chatHistoryStorageKey(data.profile.patientId);
+  const userId = data.profile.id;
   const availableStarters = online ? starters : offlineStarters;
   const initial = useMemo<ChatMessage[]>(() => {
     const greetings: Record<Language, string> = {
@@ -924,13 +944,42 @@ function AssistantPage({ language, data, accessToken, online }: { language: Lang
   const activeSummary = summarizeConversation(activeConversation, language);
 
   useEffect(() => {
+    let cancelled = false;
     try {
       const raw = localStorage.getItem(storageKey);
+      const finishWithCloud = (localConversations: ChatConversation[], activeId: string) => {
+        if (!online) {
+          setHistoryReady(true);
+          onSyncPendingChange(localConversations.some((conversation) => hasPatientMessages(conversation.messages)));
+          return;
+        }
+        loadCloudChatConversations(userId)
+          .then((remote) => {
+            if (cancelled) return;
+            const merged = mergeChatConversations(localConversations, remote);
+            const nextActive = merged.find((conversation) => conversation.id === activeId) ?? merged[0];
+            setHistory(merged);
+            if (nextActive?.messages.length) {
+              setActiveConversationId(nextActive.id);
+              setMessages(nextActive.messages);
+            }
+            localStorage.setItem(storageKey, JSON.stringify({
+              activeConversationId: nextActive?.id ?? activeId,
+              conversations: merged,
+            }));
+            onSyncPendingChange(false);
+          })
+          .catch(() => onSyncPendingChange(localConversations.some((conversation) => hasPatientMessages(conversation.messages))))
+          .finally(() => {
+            if (!cancelled) setHistoryReady(true);
+          });
+      };
       if (!raw) {
         setHistory([]);
-        setActiveConversationId(crypto.randomUUID());
+        const nextActiveId = crypto.randomUUID();
+        setActiveConversationId(nextActiveId);
         setMessages(initial);
-        setHistoryReady(true);
+        finishWithCloud([], nextActiveId);
         return;
       }
       const parsed = JSON.parse(raw) as { activeConversationId?: string; conversations?: ChatConversation[] };
@@ -940,14 +989,15 @@ function AssistantPage({ language, data, accessToken, online }: { language: Lang
       setHistory(savedConversations);
       setActiveConversationId(savedActiveId);
       setMessages(savedActive?.messages?.length ? savedActive.messages : initial);
+      finishWithCloud(savedConversations, savedActiveId);
     } catch {
       setHistory([]);
       setActiveConversationId(crypto.randomUUID());
       setMessages(initial);
-    } finally {
       setHistoryReady(true);
     }
-  }, [initial, storageKey]);
+    return () => { cancelled = true; };
+  }, [initial, online, onSyncPendingChange, storageKey, userId]);
 
   useEffect(() => {
     setMessages((current) =>
@@ -973,9 +1023,38 @@ function AssistantPage({ language, data, accessToken, online }: { language: Lang
         ...current.filter((conversation) => conversation.id !== activeConversationId),
       ].slice(0, 50);
       localStorage.setItem(storageKey, JSON.stringify({ activeConversationId, conversations: next }));
+      if (online) {
+        void syncCloudChatConversations(userId, next)
+          .then((result) => onSyncPendingChange(result.pending))
+          .catch(() => onSyncPendingChange(next.some((conversation) => hasPatientMessages(conversation.messages))));
+      } else {
+        onSyncPendingChange(next.some((conversation) => hasPatientMessages(conversation.messages)));
+      }
       return next;
     });
-  }, [activeConversationId, historyReady, language, messages, storageKey]);
+  }, [activeConversationId, historyReady, language, messages, onSyncPendingChange, online, storageKey, userId]);
+
+  useEffect(() => {
+    if (!historyReady || !online) return;
+    let cancelled = false;
+    syncCloudChatConversations(userId, history)
+      .then((result) => {
+        if (!cancelled) onSyncPendingChange(result.pending);
+        return loadCloudChatConversations(userId);
+      })
+      .then((remote) => {
+        if (cancelled) return;
+        const merged = mergeChatConversations(history, remote);
+        if (!sameConversationList(history, merged)) {
+          setHistory(merged);
+          localStorage.setItem(storageKey, JSON.stringify({ activeConversationId, conversations: merged }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) onSyncPendingChange(history.some((conversation) => hasPatientMessages(conversation.messages)));
+      });
+    return () => { cancelled = true; };
+  }, [activeConversationId, history, historyReady, onSyncPendingChange, online, storageKey, userId]);
 
   function startNewConversation() {
     setActiveConversationId(crypto.randomUUID());
@@ -1963,7 +2042,7 @@ export default function HomePage() {
         <div className="content">
           {page === "dashboard" && <Dashboard go={go} data={patientData} language={language} />}{" "}
           {page === "summary" && <SummaryPage go={go} data={patientData} language={language} />}{" "}
-          {page === "assistant" && <AssistantPage language={language} data={patientData} accessToken={accessToken} online={online && sessionSource === "online"} />}{" "}
+          {page === "assistant" && <AssistantPage language={language} data={patientData} accessToken={accessToken} online={online && sessionSource === "online"} onSyncPendingChange={setPendingSync} />}{" "}
           {page === "ckd" && <PossibleRisksPage data={patientData} language={language} />}{" "}
           {page === "results" && <ResultsPage data={patientData} language={language} />}{" "}
           {page === "footcheck" && <FootHealthPage userId={patientData.profile.id} language={language} />}{" "}

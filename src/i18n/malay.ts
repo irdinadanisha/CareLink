@@ -165,6 +165,8 @@ const ms: Record<string, string> = {
   "Clear conversation": "Kosongkan perbualan",
   "This AI provides general educational information. It does not diagnose, prescribe treatment, or replace your doctor.":
     "AI ini memberikan maklumat pendidikan umum. Ia tidak membuat diagnosis, menetapkan rawatan atau menggantikan doktor anda.",
+  "Your AI conversations are recorded and may be shared with your doctor for clinical follow-up and diagnosis. Do not use this assistant for emergencies.":
+    "Perbualan AI anda direkodkan dan mungkin dikongsi dengan doktor untuk susulan klinikal dan diagnosis. Jangan gunakan pembantu ini untuk kecemasan.",
   "Care Assistant": "Pembantu Penjagaan",
   "Powered by GPT-OSS 20B": "Dikuasakan oleh GPT-OSS 20B",
   "Ask about your health records…": "Tanya tentang rekod kesihatan anda…",
@@ -550,6 +552,7 @@ const zh: Record<string, string> = {
   "Delete this chat history?": "删除此聊天记录？",
   "Clear conversation": "清除对话",
   "This AI provides general educational information. It does not diagnose, prescribe treatment, or replace your doctor.": "此 AI 提供一般教育信息。它不会诊断、开药或取代医生。",
+  "Your AI conversations are recorded and may be shared with your doctor for clinical follow-up and diagnosis. Do not use this assistant for emergencies.": "您的 AI 对话会被记录，并可能与医生分享，以便进行临床跟进和诊断。紧急情况请勿使用此助手。",
   "Care Assistant": "护理助手",
   "Powered by GPT-OSS 20B": "由 GPT-OSS 20B 提供支持",
   "Ask about your health records…": "询问您的健康记录…",
@@ -832,6 +835,7 @@ const ta: Record<string, string> = {
   "Delete this chat history?": "இந்த உரையாடல் வரலாற்றை நீக்கவா?",
   "Clear conversation": "உரையாடலை அழிக்கவும்",
   "This AI provides general educational information. It does not diagnose, prescribe treatment, or replace your doctor.": "இந்த AI பொதுவான கல்வி தகவலை வழங்குகிறது. இது நோயறிதல் செய்யாது, மருந்து பரிந்துரைக்காது, மருத்துவரை மாற்றாது.",
+  "Your AI conversations are recorded and may be shared with your doctor for clinical follow-up and diagnosis. Do not use this assistant for emergencies.": "உங்கள் AI உரையாடல்கள் பதிவு செய்யப்பட்டு, மருத்துவத் தொடர்கண்காணிப்பு மற்றும் நோயறிதலுக்காக மருத்துவருடன் பகிரப்படலாம். அவசரநிலைகளுக்கு இந்த உதவியாளரைப் பயன்படுத்த வேண்டாம்.",
   "Care Assistant": "பராமரிப்பு உதவியாளர்",
   "Powered by GPT-OSS 20B": "GPT-OSS 20B மூலம் இயக்கப்படுகிறது",
   "Ask about your health records…": "உங்கள் சுகாதார பதிவுகள் பற்றி கேளுங்கள்…",

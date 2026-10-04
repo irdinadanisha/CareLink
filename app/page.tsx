@@ -1265,6 +1265,9 @@ function AssistantPage({
         This AI provides general educational information. It does not diagnose,
         prescribe treatment, or replace your doctor.
       </Notice>
+      <Notice kind="warning">
+        {translate("Your AI conversations are recorded and may be shared with your doctor for clinical follow-up and diagnosis. Do not use this assistant for emergencies.", language)}
+      </Notice>
       <div className={`assistant-layout ${showHistory ? "" : "history-hidden"}`}>
         {showHistory && (
           <aside className="chat-history-panel card">

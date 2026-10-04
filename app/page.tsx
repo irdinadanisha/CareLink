@@ -49,7 +49,13 @@ import { sendMessageToLlama } from "@/src/services/llamaService";
 import type { ChatMessage, Page } from "@/src/types";
 import { KidneysIcon } from "@/src/components/KidneysIcon";
 import { NeuropathyIcon } from "@/src/components/NeuropathyIcon";
-import { applyLanguage, type Language } from "@/src/i18n/malay";
+import {
+  applyLanguage,
+  getLanguageLabel,
+  isLanguage,
+  languageOptions,
+  type Language,
+} from "@/src/i18n/malay";
 import {
   restorePatientSession,
   signInPatient,
@@ -131,7 +137,7 @@ function Header({
   title: string;
   onMenu: () => void;
   language: Language;
-  onLanguageChange: () => void;
+  onLanguageChange: (language: Language) => void;
   patientName: string;
 }) {
   return (
@@ -148,16 +154,19 @@ function Header({
         <h1>{title}</h1>
       </div>
       <div className="top-actions">
-        <button
-          className="language-button"
-          onClick={onLanguageChange}
-          aria-label={
-            language === "en" ? "Tukar ke Bahasa Melayu" : "Switch to English"
-          }
-        >
+        <label className="language-button" aria-label="Preferred language">
           <Languages size={18} />
-          <span>{language === "en" ? "BM" : "EN"}</span>
-        </button>
+          <select
+            value={language}
+            onChange={(event) => onLanguageChange(event.target.value as Language)}
+          >
+            {languageOptions.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.shortLabel}
+              </option>
+            ))}
+          </select>
+        </label>
         <button className="icon-button" aria-label="Notifications">
           <Bell size={21} />
           <i />
@@ -626,17 +635,31 @@ const starters = [
   "What are the possible side effects, and how can I manage them?",
 ];
 function AssistantPage({ language, data, accessToken }: { language: Language; data: CareLinkPatientData; accessToken: string }) {
-  const initial: ChatMessage[] = [
-    {
-      id: "1",
-      role: "assistant",
-      content: `Hello ${data.profile.fullName.split(" ")[0]} — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?`,
-      time: "9:41 AM",
-    },
-  ];
+  const firstName = data.profile.fullName.split(" ")[0];
+  const initial = useMemo<ChatMessage[]>(() => {
+    const greetings: Record<Language, string> = {
+      en: `Hello ${firstName} — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?`,
+      ms: `Hai ${firstName} — saya boleh membantu menerangkan keputusan diabetes dan pelan penjagaan anda dalam bahasa yang mudah. Apakah yang ingin anda fahami?`,
+      zh: `你好 ${firstName} — 我可以用清楚、日常的语言解释您的糖尿病结果和护理计划。您想了解什么？`,
+      ta: `வணக்கம் ${firstName} — உங்கள் நீரிழிவு முடிவுகள் மற்றும் பராமரிப்பு திட்டத்தை எளிய மொழியில் விளக்க உதவுகிறேன். நீங்கள் என்ன புரிந்துகொள்ள விரும்புகிறீர்கள்?`,
+    };
+    return [
+      {
+        id: "1",
+        role: "assistant",
+        content: greetings[language],
+        time: language === "en" ? "9:41 AM" : "9:41 AM",
+      },
+    ];
+  }, [firstName, language]);
   const [messages, setMessages] = useState(initial),
     [text, setText] = useState(""),
     [typing, setTyping] = useState(false);
+  useEffect(() => {
+    setMessages((current) =>
+      current.length === 1 && current[0]?.id === "1" ? initial : current,
+    );
+  }, [initial]);
   async function send(value = text) {
     if (!value.trim() || typing) return;
     const msg: ChatMessage = {
@@ -1234,7 +1257,7 @@ function ProfilePage({
             </div>
             <div>
               <small>Preferred language</small>
-              <strong>{language === "ms" ? "Bahasa Melayu" : "English"}</strong>
+              <strong>{getLanguageLabel(language)}</strong>
             </div>
           </div>
           <button className="secondary wide">Edit personal details</button>
@@ -1315,9 +1338,13 @@ export default function HomePage() {
     [menu, setMenu] = useState(false),
     [largeText, setLargeText] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("carelink-large-text") === "true"),
     [darkMode, setDarkMode] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("carelink-dark-mode") === "true"),
-    [language, setLanguage] = useState<Language>(() =>
-      typeof window !== "undefined" && window.localStorage.getItem("carelink-language") === "ms" ? "ms" : "en",
-    );
+    [language, setLanguage] = useState<Language>(() => {
+      const saved =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem("carelink-language")
+          : null;
+      return isLanguage(saved) ? saved : "en";
+    });
   useEffect(() => {
     let active = true;
     restorePatientSession().then((session) => {
@@ -1364,12 +1391,10 @@ export default function HomePage() {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [largeText, page, patientData]);
-  const changeLanguage = () =>
-    setLanguage((current) => {
-      const next = current === "en" ? "ms" : "en";
-      window.localStorage.setItem("carelink-language", next);
-      return next;
-    });
+  const changeLanguage = (next: Language) => {
+    window.localStorage.setItem("carelink-language", next);
+    setLanguage(next);
+  };
   const title = useMemo(
     () => page === "settings" ? "Settings" : nav.find((x) => x.id === page)?.label || "Home",
     [page],

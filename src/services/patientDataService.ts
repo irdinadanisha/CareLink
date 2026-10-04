@@ -16,7 +16,7 @@ type ProfileRow = {
   date_of_birth: string;
   diabetes_type: string;
   diabetes_duration_years: number;
-  preferred_language: "en" | "ms";
+  preferred_language: "en" | "ms" | "zh" | "ta";
 };
 
 function toProfile(row: ProfileRow): PatientProfile {

@@ -5,7 +5,7 @@ type ConversationMessage = {
 
 type PatientContext = {
   conversation?: ConversationMessage[];
-  language?: "en" | "ms";
+  language?: "en" | "ms" | "zh" | "ta";
   accessToken?: string;
 };
 

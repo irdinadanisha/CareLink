@@ -6,7 +6,7 @@ export interface NephropathyPredictionResult { probability:number; category:stri
 export interface ClinicalSummary { sections:{title:string;text:string;items?:string[]}[] }
 export interface PatientProfile {
   id:string; patientId:string; fullName:string; email:string; dateOfBirth:string;
-  diabetesType:string; diabetesDurationYears:number; preferredLanguage:"en"|"ms";
+  diabetesType:string; diabetesDurationYears:number; preferredLanguage:"en"|"ms"|"zh"|"ta";
 }
 export interface PatientRecordData {
   medication:string; bloodPressure:string; kidneyFunction:number;

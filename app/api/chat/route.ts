@@ -54,9 +54,14 @@ export async function POST(request: Request) {
     if (!messages.length || messages.at(-1)?.role !== "user") {
       return NextResponse.json({ error: "The latest conversation message must be from the patient." }, { status: 400 });
     }
-    const language = body.language === "ms"
-      ? "Answer only in natural Bahasa Melayu used in Malaysia. Avoid Indonesian vocabulary."
-      : "Answer only in clear English.";
+    const language =
+      body.language === "ms"
+        ? "Answer only in natural Bahasa Melayu used in Malaysia. Avoid Indonesian vocabulary."
+        : body.language === "zh"
+          ? "Answer only in clear Mandarin Chinese using Simplified Chinese characters. Keep medical explanations patient-friendly for Malaysian Chinese users."
+          : body.language === "ta"
+            ? "Answer only in clear Tamil. Keep medical explanations patient-friendly for Malaysian Tamil users."
+            : "Answer only in clear English.";
     const completion = await new Groq({ apiKey }).chat.completions.create({
       model: MODEL,
       temperature: 0.3,

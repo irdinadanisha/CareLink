@@ -32,7 +32,10 @@ export async function POST(request: Request) {
   });
   const caller = await admin.auth.getUser(token);
   if (caller.error || !caller.data.user) {
-    return NextResponse.json({ error: "The doctor session is invalid or expired." }, { status: 401 });
+    return NextResponse.json(
+  { error: ⁠ The doctor session is invalid or expired.${caller.error ? ` (${caller.error.message}) ⁠ : ""}` },
+  { status: 401 },
+);
   }
 
   const doctor = await admin

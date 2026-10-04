@@ -103,6 +103,19 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Demo patient access
+
+Use this demo patient account for judging and walkthroughs:
+
+```text
+Name: Noor Ahmad
+Email: noor.ahmad@demo.carelink.my
+Password: CareLink!Noor26
+Offline PIN: 1234
+```
+
+The offline PIN is stored on the device/browser after first setup. If the app asks you to create a PIN, enter `1234` for the demo.
+
 Doctor portal:
 
 ```bash

@@ -32,6 +32,7 @@ import {
   Sparkles,
   Stethoscope,
   TestTube2,
+  Trash2,
   Upload,
   User,
   X,
@@ -69,8 +70,9 @@ import {
   signOutPatient,
 } from "@/src/services/patientDataService";
 import type { CareLinkPatientData } from "@/src/types";
-import { listFootChecks, saveFootCheck, syncPendingFootChecks, type FootCheckRecord } from "@/src/services/footCheckService";
+import { deleteFootCheck, listFootChecks, saveFootCheck, syncPendingFootChecks, type FootCheckRecord } from "@/src/services/footCheckService";
 import {
+  deleteCloudChatConversation,
   loadCloudChatConversations,
   mergeChatConversations,
   syncCloudChatConversations,
@@ -1068,6 +1070,25 @@ function AssistantPage({
     setText("");
   }
 
+  function deleteConversation(conversation: ChatConversation) {
+    if (!window.confirm(translate("Delete this chat history?", language))) return;
+    const next = history.filter((item) => item.id !== conversation.id);
+    const nextActive = conversation.id === activeConversationId ? next[0] : activeConversation;
+    const nextActiveId = nextActive?.id ?? crypto.randomUUID();
+    setHistory(next);
+    if (conversation.id === activeConversationId) {
+      setActiveConversationId(nextActiveId);
+      setMessages(nextActive?.messages ?? initial);
+    }
+    localStorage.setItem(storageKey, JSON.stringify({
+      activeConversationId: conversation.id === activeConversationId ? nextActiveId : activeConversationId,
+      conversations: next,
+    }));
+    void deleteCloudChatConversation(userId, conversation.id)
+      .then((result) => onSyncPendingChange(result.pending))
+      .catch(() => onSyncPendingChange(true));
+  }
+
   async function send(value = text, starterKey?: string) {
     if (!value.trim() || typing) return;
     const msg: ChatMessage = {
@@ -1157,14 +1178,23 @@ function AssistantPage({
             {visibleHistory.length ? (
               <div className="history-list">
                 {visibleHistory.map((conversation) => (
-                  <button
+                  <div
                     key={conversation.id}
-                    className={conversation.id === activeConversationId ? "selected" : ""}
-                    onClick={() => openConversation(conversation)}
+                    className={`history-item ${conversation.id === activeConversationId ? "selected" : ""}`}
                   >
-                    <strong>{conversation.title}</strong>
-                    <small>{displayDateTime(conversation.updatedAt, language)}</small>
-                  </button>
+                    <button type="button" onClick={() => openConversation(conversation)}>
+                      <strong>{conversation.title}</strong>
+                      <small>{displayDateTime(conversation.updatedAt, language)}</small>
+                    </button>
+                    <button
+                      type="button"
+                      className="delete-history"
+                      onClick={() => deleteConversation(conversation)}
+                      aria-label={translate("Delete chat", language)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -1679,6 +1709,12 @@ function FootHealthPage({ userId, language }: { userId: string; language: Langua
     setAnswers({ redness: null, swelling: null, warmth: null });
     setImage(null); setResult(null); setError("");
   };
+  const removeCheck = async (check: FootCheckRecord) => {
+    if (!window.confirm(translate("Delete this wound check?", language))) return;
+    setHistory((current) => current.filter((item) => item.id !== check.id));
+    const deleted = await deleteFootCheck(userId, check);
+    if (deleted.pending) setError(translate("Deleted locally. It will sync when internet returns.", language));
+  };
   const questions: { key: keyof FootAnswers; title: string; hint: string }[] = [
     { key: "redness", title: "Is the wound or surrounding skin redder than usual?", hint: "Look for new redness, spreading redness, or a noticeable change from your usual skin colour." },
     { key: "swelling", title: "Is there new swelling around the wound or affected area?", hint: "Look for new puffiness, tight-looking skin, or a clear difference from the surrounding area." },
@@ -1714,6 +1750,7 @@ function FootHealthPage({ userId, language }: { userId: string; language: Langua
         {history.length === 0 ? <p>{translate("No wound health checks saved yet.", language)}</p> : history.map((check) => <article key={check.id}>
           {check.imageUrl && <img src={check.imageUrl} alt={translate("Previously uploaded wound check", language)} />}
           <div><strong>{translate(`${check.symptomCount}/3 signs reported`, language)}</strong><small>{displayDateTime(check.createdAt, language)}</small><span className={check.recommendation === "doctor_attention" ? "attention" : "monitor"}>{translate(check.syncStatus === "pending" ? "Saved locally · waiting to sync" : check.recommendation === "doctor_attention" ? "Doctor’s attention advised" : "Continue monitoring", language)}</span></div>
+          <button type="button" className="delete-history foot-delete" onClick={() => removeCheck(check)} aria-label={translate("Delete wound check", language)}><Trash2 size={15} /></button>
         </article>)}
       </aside>
     </div>

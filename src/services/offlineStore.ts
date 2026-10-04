@@ -173,3 +173,8 @@ export async function markOfflineFootCheckSynced(id: string, imageUrl = "") {
     };
   });
 }
+
+export async function deleteOfflineFootCheck(id: string) {
+  if (typeof indexedDB === "undefined") return;
+  await withStore(FOOT_CHECK_STORE, "readwrite", (store) => store.delete(id));
+}

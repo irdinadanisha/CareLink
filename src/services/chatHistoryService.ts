@@ -11,6 +11,31 @@ type ChatConversationRow = {
   updated_at: string;
 };
 
+const deletedChatsKey = (userId: string) => `carelink-deleted-chat-conversations-${userId}`;
+
+export function deletedChatConversationIds(userId: string) {
+  if (typeof localStorage === "undefined") return new Set<string>();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(deletedChatsKey(userId)) || "[]") as string[]);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function queueDeletedChatConversation(userId: string, id: string) {
+  if (typeof localStorage === "undefined") return;
+  const next = deletedChatConversationIds(userId);
+  next.add(id);
+  localStorage.setItem(deletedChatsKey(userId), JSON.stringify([...next]));
+}
+
+function clearDeletedChatConversation(userId: string, id: string) {
+  if (typeof localStorage === "undefined") return;
+  const next = deletedChatConversationIds(userId);
+  next.delete(id);
+  localStorage.setItem(deletedChatsKey(userId), JSON.stringify([...next]));
+}
+
 function toConversation(row: ChatConversationRow): ChatConversation {
   return {
     id: row.id,
@@ -50,6 +75,8 @@ export function mergeChatConversations(
 
 export async function loadCloudChatConversations(userId: string) {
   if (typeof navigator !== "undefined" && !navigator.onLine) return [];
+  await syncDeletedChatConversations(userId).catch(() => undefined);
+  const deleted = deletedChatConversationIds(userId);
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase
     .from("chat_conversations")
@@ -59,7 +86,7 @@ export async function loadCloudChatConversations(userId: string) {
     .limit(50)
     .returns<ChatConversationRow[]>();
   if (error) throw new Error(error.message);
-  return (data ?? []).map(toConversation);
+  return (data ?? []).map(toConversation).filter((conversation) => !deleted.has(conversation.id));
 }
 
 export async function syncCloudChatConversations(
@@ -67,14 +94,38 @@ export async function syncCloudChatConversations(
   conversations: ChatConversation[],
 ) {
   if (typeof navigator !== "undefined" && !navigator.onLine) return { synced: 0, pending: conversations.length > 0 };
+  const deleteResult = await syncDeletedChatConversations(userId);
+  const deleted = deletedChatConversationIds(userId);
   const syncable = conversations.filter((conversation) =>
-    conversation.messages.some((message) => message.role === "user"),
+    !deleted.has(conversation.id) && conversation.messages.some((message) => message.role === "user"),
   );
-  if (!syncable.length) return { synced: 0, pending: false };
+  if (!syncable.length) return { synced: 0, pending: deleteResult.pending };
   const supabase = getSupabaseBrowserClient();
   const { error } = await supabase
     .from("chat_conversations")
     .upsert(syncable.map((conversation) => toRow(userId, conversation)), { onConflict: "id" });
   if (error) return { synced: 0, pending: true };
-  return { synced: syncable.length, pending: false };
+  return { synced: syncable.length, pending: deleteResult.pending };
+}
+
+export async function deleteCloudChatConversation(userId: string, id: string) {
+  queueDeletedChatConversation(userId, id);
+  if (typeof navigator !== "undefined" && !navigator.onLine) return { pending: true };
+  const result = await syncDeletedChatConversations(userId);
+  return { pending: result.pending };
+}
+
+export async function syncDeletedChatConversations(userId: string) {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return { pending: deletedChatConversationIds(userId).size > 0 };
+  }
+  const ids = [...deletedChatConversationIds(userId)];
+  if (!ids.length) return { pending: false };
+  const supabase = getSupabaseBrowserClient();
+  for (const id of ids) {
+    const { error } = await supabase.from("chat_conversations").delete().eq("id", id).eq("user_id", userId);
+    if (error) return { pending: true };
+    clearDeletedChatConversation(userId, id);
+  }
+  return { pending: false };
 }

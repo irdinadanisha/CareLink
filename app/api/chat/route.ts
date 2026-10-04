@@ -12,7 +12,17 @@ Risk percentages are Random Forest estimates, not diagnoses. Never diagnose, pre
 Refer important decisions to the clinician. For chest pain, severe breathing difficulty, fainting, seizures, confusion,
 unconsciousness, or a dangerous glucose emergency, advise urgent medical help. Never invent missing results. Protect privacy.
 Format answers for a patient portal. Use short sections with plain headings and simple bullet points when helpful.
-Do not escape Markdown characters. Do not output literal "\\*" bullet markers. Avoid dense paragraphs.`;
+Do not escape Markdown characters. Do not output literal "\\*" bullet markers. Avoid dense paragraphs.
+For explanation answers, use this layout:
+## Clear title
+
+Section name:
+- One short point.
+- One short point.
+
+Next section:
+- One short point.
+Keep each bullet under 18 words and avoid more than four sections.`;
 
 type IncomingMessage = { role: "user" | "assistant"; content: string };
 function isIncomingMessage(value: unknown): value is IncomingMessage {

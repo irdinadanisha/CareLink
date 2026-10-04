@@ -79,6 +79,46 @@ const formatAssistantText = (value: string) =>
     .replace(/(?:^|\s)•\s+/g, "\n• ")
     .trim();
 
+function AssistantResponse({ content }: { content: string }) {
+  const normalized = formatAssistantText(content)
+    .replace(/\s+-\s+/g, "\n- ")
+    .replace(/\n{3,}/g, "\n\n");
+  const lines = normalized.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const blocks: React.ReactNode[] = [];
+  let bullets: string[] = [];
+  const flushBullets = () => {
+    if (!bullets.length) return;
+    blocks.push(
+      <ul key={`list-${blocks.length}`}>
+        {bullets.map((bullet) => (
+          <li key={`${blocks.length}-${bullet}`}>{bullet}</li>
+        ))}
+      </ul>,
+    );
+    bullets = [];
+  };
+
+  lines.forEach((line) => {
+    const bullet = line.match(/^[-•]\s*(.+)$/);
+    if (bullet) {
+      bullets.push(bullet[1]);
+      return;
+    }
+    flushBullets();
+    const heading = line.replace(/^#{1,3}\s*/, "");
+    const isHeading = /^#{1,3}\s+/.test(line) || /:$/.test(line);
+    blocks.push(
+      isHeading ? (
+        <h4 key={`heading-${blocks.length}`}>{heading}</h4>
+      ) : (
+        <p key={`text-${blocks.length}`}>{heading}</p>
+      ),
+    );
+  });
+  flushBullets();
+  return <div className="assistant-response">{blocks}</div>;
+}
+
 const nav = [
   { id: "dashboard", label: "Home", icon: Home },
   { id: "summary", label: "Health Summary", icon: ClipboardList },
@@ -751,7 +791,13 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
                 </div>
               )}
               <div>
-                <div className="bubble">{formatAssistantText(m.content)}</div>
+                <div className="bubble">
+                  {m.role === "assistant" ? (
+                    <AssistantResponse content={m.content} />
+                  ) : (
+                    formatAssistantText(m.content)
+                  )}
+                </div>
                 <time>{m.time}</time>
               </div>
             </div>

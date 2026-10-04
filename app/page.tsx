@@ -331,7 +331,7 @@ function Login({ onLogin }: { onLogin: (email: string, password: string) => Prom
   );
 }
 
-function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientData }) {
+function Dashboard({ go, data, language }: { go: (p: Page) => void; data: CareLinkPatientData; language: Language }) {
   const [nephropathyRisk, setNephropathyRisk] = useState<Awaited<
     ReturnType<typeof predictNephropathyRisk>
   > | null>(null);
@@ -385,13 +385,15 @@ function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientD
           }
         : base;
   });
+  const firstName = data.profile.fullName.split(" ")[0];
+  const conditionText = `Your condition currently ${overallStatus === "Stable" ? "appears stable" : "needs attention"}.`;
   return (
     <>
       <section className="welcome">
         <div>
           <p className="eyebrow">SATURDAY, 1 AUGUST 2026</p>
           <h2>
-            Good morning, {data.profile.fullName.split(" ")[0]} <span>👋</span>
+            {translate(`Good morning, ${firstName}`, language)} <span>👋</span>
           </h2>
           <p>Here’s a clear look at how you’re doing today.</p>
         </div>
@@ -405,8 +407,8 @@ function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientD
         </span>
         <div>
           <p className="eyebrow">YOUR HEALTH AT A GLANCE</p>
-          <h3>Your condition currently {overallStatus === "Stable" ? "appears stable" : "needs attention"}.</h3>
-          <p>{overallMessage}</p>
+          <h3>{translate(conditionText, language)}</h3>
+          <p>{translate(overallMessage, language)}</p>
         </div>
         <StatusBadge status={overallStatus} />
       </section>
@@ -433,12 +435,12 @@ function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientD
                 </span>
                 <StatusBadge status={m.status} />
               </div>
-              <p>{m.name}</p>
+              <p>{translate(m.name, language)}</p>
               <h3>{m.value}</h3>
-              <small>{m.range}</small>
+              <small>{translate(m.range, language)}</small>
               <div className="divider" />
-              <p className="explain">{m.explanation}</p>
-              <time>{m.date}</time>
+              <p className="explain">{translate(m.explanation, language)}</p>
+              <time>{translate(m.date, language)}</time>
             </article>
           );
         })}
@@ -454,8 +456,8 @@ function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientD
               <ClipboardList />
             </span>
           </div>
-          <blockquote>“{data.record.clinicalSummary.sections[0]?.text}”</blockquote>
-          <p>{data.record.clinicalSummary.sections[1]?.text}</p>
+          <blockquote>“{translate(data.record.clinicalSummary.sections[0]?.text ?? "", language)}”</blockquote>
+          <p>{translate(data.record.clinicalSummary.sections[1]?.text ?? "", language)}</p>
           <div className="button-row">
             <button className="primary" onClick={() => go("summary")}>
               View full summary
@@ -522,7 +524,7 @@ function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientD
               </span>
               <div>
                 <h4>{s.title}</h4>
-                <p>{s.text}</p>
+              <p>{translate(s.text, language)}</p>
               </div>
             </article>
           ))}
@@ -534,8 +536,8 @@ function Dashboard({ go, data }: { go: (p: Page) => void; data: CareLinkPatientD
         </span>
         <div>
           <p className="eyebrow">UPCOMING APPOINTMENT</p>
-          <h3>{data.record.appointments[0]?.type}</h3>
-          <p>{data.record.appointments[0]?.doctor} · Diabetes Clinic</p>
+          <h3>{translate(data.record.appointments[0]?.type ?? "", language)}</h3>
+          <p>{data.record.appointments[0]?.doctor} · {translate("Diabetes Clinic", language)}</p>
         </div>
         <div className="appointment-date">
           <strong>20</strong>
@@ -596,7 +598,7 @@ function TrendChart({ data }: { data: { month: string; value: number }[] }) {
   );
 }
 
-function SummaryPage({ go, data }: { go: (p: Page) => void; data: CareLinkPatientData }) {
+function SummaryPage({ go, data, language }: { go: (p: Page) => void; data: CareLinkPatientData; language: Language }) {
   const [original, setOriginal] = useState(false);
   return (
     <>
@@ -604,9 +606,7 @@ function SummaryPage({ go, data }: { go: (p: Page) => void; data: CareLinkPatien
         <div>
           <p className="eyebrow">LAST UPDATED {displayDate(data.recordDate).toUpperCase()}</p>
           <h2>Your Clinical Notes, Explained Simply</h2>
-          <p>
-            A patient-friendly explanation of your latest visit with {data.record.appointments[0]?.doctor}.
-          </p>
+          <p>{translate(`A patient-friendly explanation of your latest visit with ${data.record.appointments[0]?.doctor}.`, language)}</p>
         </div>
         <button className="secondary" onClick={() => setOriginal(!original)}>
           <Eye size={18} />
@@ -629,12 +629,12 @@ function SummaryPage({ go, data }: { go: (p: Page) => void; data: CareLinkPatien
             <article className="card summary-section" key={s.title}>
               <span className={`number n${i}`}>{i + 1}</span>
               <div>
-                <h3>{s.title}</h3>
-                <p>{s.text}</p>
+                <h3>{translate(s.title, language)}</h3>
+                <p>{translate(s.text, language)}</p>
                 {s.items && (
                   <ul>
                     {s.items.map((x) => (
-                      <li key={x}>{x}</li>
+                      <li key={x}>{translate(x, language)}</li>
                     ))}
                   </ul>
                 )}
@@ -864,11 +864,13 @@ function RiskCard({
   kind,
   result,
   recordDate,
+  language,
 }: {
   title: string;
   kind: "nephropathy" | "neuropathy";
   result: RiskResult;
   recordDate: string;
+  language: Language;
 }) {
   const Icon = kind === "nephropathy" ? KidneysIcon : NeuropathyIcon;
   const recommendation =
@@ -889,14 +891,14 @@ function RiskCard({
         </span>
         <div>
           <p className="eyebrow">RANDOM FOREST ESTIMATE</p>
-          <h3>{title}</h3>
+          <h3>{translate(title, language)}</h3>
         </div>
         <StatusBadge status={result.category} />
       </div>
-      <p className="risk-description">{description}</p>
+      <p className="risk-description">{translate(description, language)}</p>
       <div className="severity prominent">
         <div className="severity-label">
-          <span>Risk progression</span>
+          <span>{translate("Risk progression", language)}</span>
           <strong>{result.probability}%</strong>
         </div>
         <div
@@ -910,45 +912,45 @@ function RiskCard({
           <span style={{ width: `${result.probability}%` }} />
         </div>
         <div className="severity-scale">
-          <span>0% · Low</span>
-          <span>30% · Moderate</span>
-          <span>60% · High</span>
+          <span>{translate("0% · Low", language)}</span>
+          <span>{translate("30% · Moderate", language)}</span>
+          <span>{translate("60% · High", language)}</span>
           <span>100%</span>
         </div>
       </div>
       <div className="risk-value">
         <strong>{result.probability}%</strong>
-        <span>estimated probability</span>
+        <span>{translate("estimated probability", language)}</span>
       </div>
-      <p>{result.explanation}</p>
+      <p>{translate(result.explanation, language)}</p>
       <div className="divider" />
-      <h4>Information used by the model</h4>
+      <h4>{translate("Information used by the model", language)}</h4>
       <ul>
         {result.factors.map((x) => (
           <li key={x}>
             <span>✓</span>
-            {x}
+            {translate(x, language)}
           </li>
         ))}
       </ul>
-      <h4>Recommended next step</h4>
+      <h4>{translate("Recommended next step", language)}</h4>
       <p>
-        {recommendation} Do not change medication or care based on this result.
+        {translate(`${recommendation} Do not change medication or care based on this result.`, language)}
       </p>
-      <time>Blood test record · {displayDate(recordDate)}</time>
+      <time>{translate(`Blood test record · ${displayDate(recordDate)}`, language)}</time>
       <div className="model-performance">
         <span>
-          Model test accuracy <b>{(result.modelAccuracy * 100).toFixed(2)}%</b>
+          {translate("Model test accuracy", language)} <b>{(result.modelAccuracy * 100).toFixed(2)}%</b>
         </span>
         <span>
-          Model ROC-AUC <b>{result.rocAuc.toFixed(4)}</b>
+          {translate("Model ROC-AUC", language)} <b>{result.rocAuc.toFixed(4)}</b>
         </span>
       </div>
     </article>
   );
 }
 
-function PossibleRisksPage({ data }: { data: CareLinkPatientData }) {
+function PossibleRisksPage({ data, language }: { data: CareLinkPatientData; language: Language }) {
   const [nephropathy, setNephropathy] = useState<RiskResult | null>(null);
   const [neuropathy, setNeuropathy] = useState<Awaited<
     ReturnType<typeof predictNeuropathyRisk>
@@ -1018,12 +1020,14 @@ function PossibleRisksPage({ data }: { data: CareLinkPatientData }) {
             kind="nephropathy"
             result={nephropathy}
             recordDate={data.recordDate}
+            language={language}
           />
           <RiskCard
             title="Neuropathy risk"
             kind="neuropathy"
             result={neuropathy}
             recordDate={data.recordDate}
+            language={language}
           />
         </div>
       )}
@@ -1031,7 +1035,7 @@ function PossibleRisksPage({ data }: { data: CareLinkPatientData }) {
   );
 }
 
-function ResultsPage({ data }: { data: CareLinkPatientData }) {
+function ResultsPage({ data, language }: { data: CareLinkPatientData; language: Language }) {
   const bloodTests = data.record.bloodTests;
   const [filter, setFilter] = useState("Latest results"),
     [selected, setSelected] = useState(bloodTests[0]);
@@ -1086,17 +1090,17 @@ function ResultsPage({ data }: { data: CareLinkPatientData }) {
               key={t.name}
             >
               <span>
-                <b>{t.name}</b>
-                <small>{t.category}</small>
+                <b>{translate(t.name, language)}</b>
+                <small>{translate(t.category, language)}</small>
               </span>
               <span>
                 <strong>{t.value}</strong> {t.unit}
               </span>
-              <span>{t.range}</span>
+              <span>{translate(t.range, language)}</span>
               <span>
                 <StatusBadge status={t.status} />
               </span>
-              <span>{t.date}</span>
+              <span>{translate(t.date, language)}</span>
             </button>
           ))}
         </div>
@@ -1105,15 +1109,15 @@ function ResultsPage({ data }: { data: CareLinkPatientData }) {
           <span className="soft-icon">
             <Droplets />
           </span>
-          <h3>{selected.name}</h3>
+          <h3>{translate(selected.name, language)}</h3>
           <div className="detail-value">
             <strong>{selected.value}</strong>
             <span>{selected.unit}</span>
           </div>
           <StatusBadge status={selected.status} />
-          <p>{selected.explanation}</p>
+          <p>{translate(selected.explanation, language)}</p>
           <div className="mini-chart">
-            <TrendChart data={selected.trend.map((value, index) => typeof value === "number" ? ({ month: ["Feb", "May"][index], value }) : value)} />
+            <TrendChart data={selected.trend.map((value, index) => typeof value === "number" ? ({ month: translate(["Feb", "May"][index], language), value }) : ({ ...value, month: translate(value.month, language) }))} />
           </div>
           <Notice>
             One result alone does not tell the full story. Your doctor will
@@ -1348,7 +1352,7 @@ function ProfilePage({
                 <User />
                 <span>
                   <b>Emergency contact</b>
-                  <small>Ahmad Zain · Spouse</small>
+                  <small>{translate("Ahmad Zain · Spouse", language)}</small>
                 </span>
               </span>
               <button>Edit</button>
@@ -1512,7 +1516,7 @@ export default function HomePage() {
           <div className="avatar">{initials(patientData.profile.fullName)}</div>
           <div>
             <strong>{patientData.profile.fullName}</strong>
-            <small>Patient · {patientData.profile.patientId}</small>
+            <small>{translate(`Patient · ${patientData.profile.patientId}`, language)}</small>
           </div>
           <button className={`sidebar-settings ${page === "settings" ? "active" : ""}`} onClick={() => go("settings")} aria-label="Open settings"><Settings size={18} /></button>
         </div>
@@ -1533,11 +1537,11 @@ export default function HomePage() {
           patientName={patientData.profile.fullName}
         />
         <div className="content">
-          {page === "dashboard" && <Dashboard go={go} data={patientData} />}{" "}
-          {page === "summary" && <SummaryPage go={go} data={patientData} />}{" "}
+          {page === "dashboard" && <Dashboard go={go} data={patientData} language={language} />}{" "}
+          {page === "summary" && <SummaryPage go={go} data={patientData} language={language} />}{" "}
           {page === "assistant" && <AssistantPage language={language} data={patientData} accessToken={accessToken} />}{" "}
-          {page === "ckd" && <PossibleRisksPage data={patientData} />}{" "}
-          {page === "results" && <ResultsPage data={patientData} />}{" "}
+          {page === "ckd" && <PossibleRisksPage data={patientData} language={language} />}{" "}
+          {page === "results" && <ResultsPage data={patientData} language={language} />}{" "}
           {page === "footcheck" && <FootHealthPage userId={patientData.profile.id} />}{" "}
           {page === "profile" && <ProfilePage language={language} data={patientData} />}
           {page === "settings" && <SettingsPage largeText={largeText} darkMode={darkMode} onLargeText={toggleLargeText} onDarkMode={toggleDarkMode} logout={logout} />}

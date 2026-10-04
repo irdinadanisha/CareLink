@@ -138,6 +138,8 @@ const ms: Record<string, string> = {
   "AI Health Assistant": "Pembantu Kesihatan AI",
   "Ask questions about your diabetes, results, and care plan.":
     "Tanya tentang diabetes, keputusan ujian dan pelan penjagaan anda.",
+  "Offline mode: suggested questions use your saved CareLink record.":
+    "Mod luar talian: soalan cadangan menggunakan rekod CareLink anda yang disimpan.",
   "Chat history": "Sejarah perbualan",
   "Saved locally": "Disimpan secara tempatan",
   "Your saved conversations will appear here.": "Perbualan yang disimpan akan muncul di sini.",
@@ -497,6 +499,7 @@ const zh: Record<string, string> = {
   "View clinic details →": "查看诊所详情 →",
   "AI Health Assistant": "AI 健康助手",
   "Ask questions about your diabetes, results, and care plan.": "询问有关糖尿病、检验结果和护理计划的问题。",
+  "Offline mode: suggested questions use your saved CareLink record.": "离线模式：建议问题会使用您已保存的 CareLink 记录。",
   "Chat history": "聊天记录",
   "Saved locally": "本地保存",
   "Your saved conversations will appear here.": "您保存的对话会显示在这里。",
@@ -752,6 +755,7 @@ const ta: Record<string, string> = {
   "View clinic details →": "கிளினிக் விவரங்களைக் காண்க →",
   "AI Health Assistant": "AI சுகாதார உதவியாளர்",
   "Ask questions about your diabetes, results, and care plan.": "உங்கள் நீரிழிவு, முடிவுகள், பராமரிப்பு திட்டம் குறித்து கேள்விகள் கேளுங்கள்.",
+  "Offline mode: suggested questions use your saved CareLink record.": "இணையமில்லா முறை: பரிந்துரைக்கப்பட்ட கேள்விகள் சேமிக்கப்பட்ட CareLink பதிவைப் பயன்படுத்தும்.",
   "Chat history": "உரையாடல் வரலாறு",
   "Saved locally": "உள்ளூரில் சேமிக்கப்பட்டது",
   "Your saved conversations will appear here.": "சேமிக்கப்பட்ட உரையாடல்கள் இங்கே தோன்றும்.",

@@ -865,9 +865,26 @@ const starters = [
   "What are my treatment options, and what are the pros and cons?",
   "What are the possible side effects, and how can I manage them?",
 ];
-function AssistantPage({ language, data, accessToken }: { language: Language; data: CareLinkPatientData; accessToken: string }) {
+const offlineStarters = [
+  "What does my HbA1c result mean?",
+  "Is my kidney function normal?",
+  "What foods can affect my blood sugar?",
+  "What should I ask my doctor?",
+  "Explain my latest health summary",
+  "What are symptoms of low blood sugar?",
+] as const;
+const offlineStarterTopics: Record<string, "hba1c" | "kidney" | "food" | "doctor" | "summary" | "low"> = {
+  "What does my HbA1c result mean?": "hba1c",
+  "Is my kidney function normal?": "kidney",
+  "What foods can affect my blood sugar?": "food",
+  "What should I ask my doctor?": "doctor",
+  "Explain my latest health summary": "summary",
+  "What are symptoms of low blood sugar?": "low",
+};
+function AssistantPage({ language, data, accessToken, online }: { language: Language; data: CareLinkPatientData; accessToken: string; online: boolean }) {
   const firstName = data.profile.fullName.split(" ")[0];
   const storageKey = chatHistoryStorageKey(data.profile.patientId);
+  const availableStarters = online ? starters : offlineStarters;
   const initial = useMemo<ChatMessage[]>(() => {
     const greetings: Record<Language, string> = {
       en: `Hello ${firstName} — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?`,
@@ -972,7 +989,7 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
     setText("");
   }
 
-  async function send(value = text) {
+  async function send(value = text, starterKey?: string) {
     if (!value.trim() || typing) return;
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -997,6 +1014,7 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
         nextAppointment: data.record.appointments[0]
           ? `${data.record.appointments[0].date} ${data.record.appointments[0].time}`
           : undefined,
+        offlineTopic: starterKey ? offlineStarterTopics[starterKey] : undefined,
       });
       setMessages((m) => [
         ...m,
@@ -1030,7 +1048,7 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
         <div>
           <p className="eyebrow">GROQ · GPT-OSS 20B</p>
           <h2>AI Health Assistant</h2>
-          <p>Ask questions about your diabetes, results, and care plan.</p>
+          <p>{translate(online ? "Ask questions about your diabetes, results, and care plan." : "Offline mode: suggested questions use your saved CareLink record.", language)}</p>
         </div>
         <div className="button-row compact-actions">
           <button className="secondary" onClick={() => setShowHistory((current) => !current)}>
@@ -1154,10 +1172,10 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
             )}
           </div>
           <div className="suggestions" aria-label="Suggested questions">
-            {starters.map((s) => (
+            {availableStarters.map((s) => (
               <button
                 key={s}
-                onClick={() => send(translate(s, language))}
+                onClick={() => send(translate(s, language), s)}
                 disabled={typing}
               >
                 {translate(s, language)}
@@ -1945,7 +1963,7 @@ export default function HomePage() {
         <div className="content">
           {page === "dashboard" && <Dashboard go={go} data={patientData} language={language} />}{" "}
           {page === "summary" && <SummaryPage go={go} data={patientData} language={language} />}{" "}
-          {page === "assistant" && <AssistantPage language={language} data={patientData} accessToken={accessToken} />}{" "}
+          {page === "assistant" && <AssistantPage language={language} data={patientData} accessToken={accessToken} online={online && sessionSource === "online"} />}{" "}
           {page === "ckd" && <PossibleRisksPage data={patientData} language={language} />}{" "}
           {page === "results" && <ResultsPage data={patientData} language={language} />}{" "}
           {page === "footcheck" && <FootHealthPage userId={patientData.profile.id} language={language} />}{" "}

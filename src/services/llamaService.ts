@@ -13,6 +13,7 @@ type PatientContext = {
   kidneyFunction?: string;
   medication?: string;
   nextAppointment?: string;
+  offlineTopic?: "hba1c" | "kidney" | "food" | "doctor" | "summary" | "low" | "general";
 };
 
 type ChatApiResponse = {
@@ -29,15 +30,19 @@ function offlineResponse(message: string, context: PatientContext) {
   const kidney = context.kidneyFunction ?? "your kidney function";
   const medication = context.medication ?? "your prescribed medication";
   const appointment = context.nextAppointment ?? "your next appointment";
-  const topic = lower.includes("kidney") || lower.includes("egfr")
+  const topic = context.offlineTopic ?? (lower.includes("kidney") || lower.includes("egfr")
     ? "kidney"
     : lower.includes("food") || lower.includes("eat") || lower.includes("diet")
       ? "food"
+      : lower.includes("doctor") || lower.includes("appointment") || lower.includes("ask")
+        ? "doctor"
+        : lower.includes("summary") || lower.includes("plan")
+          ? "summary"
       : lower.includes("low") || lower.includes("hypo")
         ? "low"
         : lower.includes("hba1c") || lower.includes("sugar") || lower.includes("glucose")
           ? "hba1c"
-          : "general";
+          : "general");
 
   const copy = {
     en: {
@@ -59,6 +64,16 @@ function offlineResponse(message: string, context: PatientContext) {
         "Balanced meals with fibre, protein, and smaller carbohydrate portions usually help.",
         "Keep a simple food and glucose log if you can.",
       ],
+      doctor: [
+        `Ask whether ${hba1c} is acceptable for your personal target.`,
+        `Ask if ${medication} should stay the same until the next review.`,
+        `Ask what warning signs need urgent care before ${appointment}.`,
+      ],
+      summary: [
+        `${hba1c} is the main blood sugar trend marker in your saved record.`,
+        `${kidney} is also saved, so kidney monitoring can continue offline.`,
+        `Your saved care plan includes ${medication} and follow-up at ${appointment}.`,
+      ],
       low: [
         "Low blood sugar can cause sweating, shaking, hunger, dizziness, or confusion.",
         "If symptoms feel severe, seek urgent medical help.",
@@ -75,6 +90,8 @@ function offlineResponse(message: string, context: PatientContext) {
       hba1c: [`${hba1c} menunjukkan purata gula darah untuk dua hingga tiga bulan lepas.`, `${glucose} boleh berubah setiap hari, jadi trend lebih penting daripada satu bacaan.`, `Teruskan ${medication} kecuali doktor menasihatkan sebaliknya.`, `Bincangkan semula semasa ${appointment}.`],
       kidney: [`${kidney} membantu menunjukkan sebaik mana buah pinggang menapis darah.`, "Diabetes boleh menjejaskan salur darah buah pinggang dari masa ke masa.", "Jangan ubah ubat berdasarkan aplikasi ini sahaja.", `Bawa keputusan ini semasa ${appointment}.`],
       food: ["Minuman manis, nasi berlebihan, pencuci mulut dan snek halus boleh menaikkan gula darah.", "Hidangan seimbang dengan serat, protein dan karbohidrat sederhana biasanya membantu.", "Catat makanan dan bacaan gula jika boleh."],
+      doctor: [`Tanya sama ada ${hba1c} sesuai untuk sasaran peribadi anda.`, `Tanya sama ada ${medication} perlu diteruskan sehingga semakan seterusnya.`, `Tanya tanda amaran yang memerlukan rawatan segera sebelum ${appointment}.`],
+      summary: [`${hba1c} ialah penanda utama trend gula darah dalam rekod tersimpan.`, `${kidney} juga disimpan, jadi pemantauan buah pinggang boleh diteruskan luar talian.`, `Pelan penjagaan tersimpan termasuk ${medication} dan susulan pada ${appointment}.`],
       low: ["Gula rendah boleh menyebabkan berpeluh, menggigil, lapar, pening atau keliru.", "Jika gejala teruk, dapatkan bantuan perubatan segera.", "Minta pelan tindakan gula rendah peribadi daripada pasukan penjagaan."],
       general: ["Saya masih boleh menggunakan rekod CareLink yang disimpan semasa luar talian.", "Untuk gejala kecemasan, hubungi bantuan kecemasan segera.", "Sambung semula internet apabila boleh supaya CareLink boleh menyegerak dan menggunakan pembantu dalam talian."],
     },
@@ -83,6 +100,8 @@ function offlineResponse(message: string, context: PatientContext) {
       hba1c: [`${hba1c} 反映过去两到三个月的平均血糖。`, `${glucose} 每天可能变化，所以趋势比单次读数更重要。`, `除非医生另有指示，请继续服用 ${medication}。`, `请在 ${appointment} 再讨论这个结果。`],
       kidney: [`${kidney} 可帮助了解肾脏过滤血液的情况。`, "糖尿病长期可能影响肾脏血管，所以定期检查很重要。", "不要只根据这个应用自行更改药物。", `请在 ${appointment} 带上这个结果讨论。`],
       food: ["含糖饮料、大量米饭、甜点和精制零食可能升高血糖。", "含纤维、蛋白质和适量碳水的均衡饮食通常有帮助。", "可以记录饮食和血糖，方便复诊讨论。"],
+      doctor: [`询问 ${hba1c} 是否符合您的个人目标。`, `询问在下次复诊前是否继续 ${medication}。`, `询问 ${appointment} 前哪些警示症状需要紧急处理。`],
+      summary: [`${hba1c} 是已保存记录中的主要血糖趋势指标。`, `${kidney} 也已保存，因此离线时仍可查看肾脏监测信息。`, `已保存的护理计划包括 ${medication} 和 ${appointment} 的复诊。`],
       low: ["低血糖可能导致出汗、发抖、饥饿、头晕或意识混乱。", "如果症状严重，请立即寻求紧急医疗帮助。", "请向护理团队询问个人低血糖处理计划。"],
       general: ["离线时我仍可使用已保存的 CareLink 记录。", "如有紧急症状，请立即联系急救服务。", "恢复网络后，CareLink 会同步并使用在线助手。"],
     },
@@ -91,6 +110,8 @@ function offlineResponse(message: string, context: PatientContext) {
       hba1c: [`${hba1c} கடந்த இரண்டு முதல் மூன்று மாத சராசரி இரத்த சர்க்கரையை காட்டுகிறது.`, `${glucose} தினமும் மாறலாம்; அதனால் ஒரு அளவை விட போக்கு முக்கியம்.`, `மருத்துவர் வேறு சொல்லாவிட்டால் ${medication} தொடருங்கள்.`, `${appointment} இல் இதை மீண்டும் பேசுங்கள்.`],
       kidney: [`${kidney} சிறுநீரகம் இரத்தத்தை எவ்வாறு வடிகட்டுகிறது என்பதை காட்ட உதவும்.`, "நீரிழிவு காலப்போக்கில் சிறுநீரக இரத்த நாளங்களை பாதிக்கலாம்.", "இந்த செயலியை மட்டும் வைத்து மருந்தை மாற்ற வேண்டாம்.", `${appointment} இல் இந்த முடிவை பேசுங்கள்.`],
       food: ["இனிப்பு பானங்கள், அதிக அரிசி, இனிப்புகள் மற்றும் சுத்திகரிக்கப்பட்ட சிற்றுண்டிகள் சர்க்கரையை உயர்த்தலாம்.", "நார்ச்சத்து, புரதம் மற்றும் அளவான கார்போஹைட்ரேட் கொண்ட உணவு உதவும்.", "முடிந்தால் உணவு மற்றும் சர்க்கரை பதிவை வைத்திருங்கள்."],
+      doctor: [`${hba1c} உங்கள் தனிப்பட்ட இலக்கிற்கு ஏற்றதா என்று கேளுங்கள்.`, `அடுத்த மதிப்பாய்வு வரை ${medication} தொடர வேண்டுமா என்று கேளுங்கள்.`, `${appointment} க்கு முன் எந்த எச்சரிக்கை அறிகுறிகள் அவசரம் என்று கேளுங்கள்.`],
+      summary: [`சேமிக்கப்பட்ட பதிவில் ${hba1c} முக்கிய இரத்த சர்க்கரை போக்கு குறியீடு.`, `${kidney} சேமிக்கப்பட்டுள்ளது, எனவே இணையமின்றியும் சிறுநீரக கண்காணிப்பை பார்க்கலாம்.`, `சேமிக்கப்பட்ட பராமரிப்பு திட்டத்தில் ${medication} மற்றும் ${appointment} பின்தொடர்ச்சி உள்ளது.`],
       low: ["குறைந்த சர்க்கரை வியர்வை, நடுக்கம், பசி, தலைச்சுற்றல் அல்லது குழப்பம் தரலாம்.", "அறிகுறிகள் கடுமையாக இருந்தால் அவசர மருத்துவ உதவி பெறுங்கள்.", "தனிப்பட்ட குறைந்த சர்க்கரை திட்டத்தை பராமரிப்பு குழுவிடம் கேளுங்கள்."],
       general: ["இணையமில்லாதபோதும் சேமிக்கப்பட்ட CareLink பதிவை பயன்படுத்த முடியும்.", "அவசர அறிகுறிகள் இருந்தால் உடனே அவசர உதவியை தொடர்புகொள்ளுங்கள்.", "இணையம் கிடைக்கும் போது CareLink ஒத்திசைத்து ஆன்லைன் உதவியாளரை பயன்படுத்தும்."],
     },

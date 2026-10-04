@@ -46,7 +46,7 @@ import {
 import { predictNephropathyRisk } from "@/src/services/randomForestNephropathyService";
 import { predictNeuropathyRisk } from "@/src/services/randomForestNeuropathyService";
 import { sendMessageToLlama } from "@/src/services/llamaService";
-import type { ChatMessage, Page } from "@/src/types";
+import type { BloodTestResult, ChatMessage, Page } from "@/src/types";
 import { KidneysIcon } from "@/src/components/KidneysIcon";
 import { NeuropathyIcon } from "@/src/components/NeuropathyIcon";
 import {
@@ -71,6 +71,22 @@ const initials = (name: string) =>
 const displayDate = (date: string) =>
   new Intl.DateTimeFormat("en-MY", { day: "2-digit", month: "short", year: "numeric" }).format(
     new Date(`${date}T00:00:00`),
+  );
+
+const normalizeTrendData = (
+  trend: BloodTestResult["trend"] | number[] | undefined,
+  language: Language,
+) =>
+  (trend ?? []).map((point, index) =>
+    typeof point === "number"
+      ? {
+          month: translate(["Feb", "May"][index] ?? String(index + 1), language),
+          value: point,
+        }
+      : {
+          month: translate(point.month, language),
+          value: point.value,
+        },
   );
 
 const formatAssistantText = (value: string) =>
@@ -1038,7 +1054,7 @@ function PossibleRisksPage({ data, language }: { data: CareLinkPatientData; lang
 function ResultsPage({ data, language }: { data: CareLinkPatientData; language: Language }) {
   const bloodTests = data.record.bloodTests;
   const [filter, setFilter] = useState("Latest results"),
-    [selected, setSelected] = useState(bloodTests[0]);
+    [selectedName, setSelectedName] = useState(bloodTests[0]?.name ?? "");
   const visible = bloodTests.filter((t) =>
     filter === "Abnormal results"
       ? t.status !== "Normal"
@@ -1048,6 +1064,12 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
           ? t.category === "Diabetes"
           : true,
   );
+  const selected =
+    visible.find((test) => test.name === selectedName) ??
+    bloodTests.find((test) => test.name === selectedName) ??
+    visible[0] ??
+    bloodTests[0];
+
   return (
     <>
       <div className="page-intro">
@@ -1085,8 +1107,8 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
           </div>
           {visible.map((t) => (
             <button
-              className={`table-row ${selected.name === t.name ? "selected" : ""}`}
-              onClick={() => setSelected(t)}
+              className={`table-row ${selected?.name === t.name ? "selected" : ""}`}
+              onClick={() => setSelectedName(t.name)}
               key={t.name}
             >
               <span>
@@ -1104,26 +1126,37 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
             </button>
           ))}
         </div>
-        <aside className="card result-detail">
-          <p className="eyebrow">RESULT EXPLAINED</p>
-          <span className="soft-icon">
-            <Droplets />
-          </span>
-          <h3>{translate(selected.name, language)}</h3>
-          <div className="detail-value">
-            <strong>{selected.value}</strong>
-            <span>{selected.unit}</span>
-          </div>
-          <StatusBadge status={selected.status} />
-          <p>{translate(selected.explanation, language)}</p>
-          <div className="mini-chart">
-            <TrendChart data={selected.trend.map((value, index) => typeof value === "number" ? ({ month: translate(["Feb", "May"][index], language), value }) : ({ ...value, month: translate(value.month, language) }))} />
-          </div>
-          <Notice>
-            One result alone does not tell the full story. Your doctor will
-            consider this alongside your overall health.
-          </Notice>
-        </aside>
+        {selected ? (
+          <aside className="card result-detail">
+            <p className="eyebrow">RESULT EXPLAINED</p>
+            <span className="soft-icon">
+              <Droplets />
+            </span>
+            <h3>{translate(selected.name, language)}</h3>
+            <div className="detail-value">
+              <strong>{selected.value}</strong>
+              <span>{selected.unit}</span>
+            </div>
+            <StatusBadge status={selected.status} />
+            <p>{translate(selected.explanation, language)}</p>
+            <div className="mini-chart">
+              <TrendChart data={normalizeTrendData(selected.trend, language)} />
+            </div>
+            <Notice>
+              One result alone does not tell the full story. Your doctor will
+              consider this alongside your overall health.
+            </Notice>
+          </aside>
+        ) : (
+          <aside className="card result-detail">
+            <p className="eyebrow">RESULT EXPLAINED</p>
+            <span className="soft-icon">
+              <Droplets />
+            </span>
+            <h3>No test results available</h3>
+            <p>There are no blood test results to show for this record.</p>
+          </aside>
+        )}
       </div>
     </>
   );

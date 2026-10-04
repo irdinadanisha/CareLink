@@ -7,8 +7,8 @@ export const assistantPatientContext = {
   recordType: "mock patient record",
   recordDate: "28 July 2026",
   patient: {
-    firstName: "Sarah",
-    age: 54,
+    firstName: "Noor",
+    age: 38,
     diabetesType: "Type 2 diabetes",
     diabetesDurationYears: 9,
   },

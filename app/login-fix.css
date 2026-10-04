@@ -21,6 +21,23 @@
   opacity: 1;
 }
 
+.login-panel {
+  position: relative;
+}
+
+.login-language-button {
+  position: absolute;
+  top: 28px;
+  right: 32px;
+}
+
+@media (max-width: 560px) {
+  .login-language-button {
+    top: 18px;
+    right: 22px;
+  }
+}
+
 .dark-mode .metric-card.risk-highlight,
 .dark-mode .metric-card.risk-highlight h3 {
   color: #163b59;

@@ -5,7 +5,7 @@ export interface BloodTestResult { name:string; value:string; unit:string; range
 export interface NephropathyPredictionResult { probability:number; category:string; explanation:string; factors:string[]; }
 export interface ClinicalSummary { sections:{title:string;text:string;items?:string[]}[] }
 export interface PatientProfile {
-  id:string; patientId:string; fullName:string; email:string; dateOfBirth:string;
+  id:string; patientId:string; fullName:string; email:string; dateOfBirth:string; age?:number;
   diabetesType:string; diabetesDurationYears:number; preferredLanguage:"en"|"ms"|"zh"|"ta";
 }
 export interface PatientRecordData {

@@ -255,7 +255,15 @@ function Header({
   );
 }
 
-function Login({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
+function Login({
+  onLogin,
+  language,
+  onLanguageChange,
+}: {
+  onLogin: (email: string, password: string) => Promise<void>;
+  language: Language;
+  onLanguageChange: (language: Language) => void;
+}) {
   const [show, setShow] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -295,6 +303,19 @@ function Login({ onLogin }: { onLogin: (email: string, password: string) => Prom
         <div className="mobile-brand">
           <Brand />
         </div>
+        <label className="language-button login-language-button" aria-label="Preferred language">
+          <Languages size={18} />
+          <select
+            value={language}
+            onChange={(event) => onLanguageChange(event.target.value as Language)}
+          >
+            {languageOptions.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.shortLabel}
+              </option>
+            ))}
+          </select>
+        </label>
         <form
           className="login-card"
           onSubmit={async (e) => {
@@ -1354,6 +1375,10 @@ function ProfilePage({
           <StatusBadge status={data.profile.diabetesType} />
           <div className="profile-fields">
             <div>
+              <small>Age</small>
+              <strong>{data.profile.age ?? "—"}</strong>
+            </div>
+            <div>
               <small>Date of birth</small>
               <strong>{displayDate(data.profile.dateOfBirth)}</strong>
             </div>
@@ -1522,7 +1547,7 @@ export default function HomePage() {
     const next = !current; window.localStorage.setItem("carelink-dark-mode", String(next)); return next;
   });
   if (authLoading) return <main className="login-page"><section className="login-side"><Brand /></section><section className="login-panel"><p>Loading your secure patient portal…</p></section></main>;
-  if (!patientData) return <Login onLogin={login} />;
+  if (!patientData) return <Login onLogin={login} language={language} onLanguageChange={changeLanguage} />;
   const go = (p: Page) => {
     setPage(p);
     setMenu(false);

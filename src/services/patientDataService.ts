@@ -19,6 +19,15 @@ type ProfileRow = {
   preferred_language: "en" | "ms" | "zh" | "ta";
 };
 
+function calculateAge(dateOfBirth: string) {
+  const birth = new Date(`${dateOfBirth}T00:00:00`);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const birthdayThisYear = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+  if (today < birthdayThisYear) age -= 1;
+  return age;
+}
+
 function toProfile(row: ProfileRow): PatientProfile {
   return {
     id: row.id,
@@ -26,6 +35,7 @@ function toProfile(row: ProfileRow): PatientProfile {
     fullName: row.full_name,
     email: row.email,
     dateOfBirth: row.date_of_birth,
+    age: calculateAge(row.date_of_birth),
     diabetesType: row.diabetes_type,
     diabetesDurationYears: row.diabetes_duration_years,
     preferredLanguage: row.preferred_language,

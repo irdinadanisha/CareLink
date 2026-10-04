@@ -40,6 +40,7 @@ const ms: Record<string, string> = {
   "Contact clinic": "Hubungi klinik",
   "SATURDAY, 1 AUGUST 2026": "SABTU, 1 OGOS 2026",
   "Good morning, Sarah": "Selamat pagi, Sarah",
+  "Good morning, Noor": "Selamat pagi, Noor",
   "Here’s a clear look at how you’re doing today.":
     "Berikut ialah gambaran ringkas kesihatan anda hari ini.",
   "Ask your health assistant": "Tanya pembantu kesihatan anda",
@@ -148,6 +149,8 @@ const ms: Record<string, string> = {
     "AI boleh melakukan kesilapan. Sahkan maklumat penting dengan pasukan penjagaan anda.",
   "Hello Sarah — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?":
     "Hai Sarah — saya boleh membantu menerangkan keputusan diabetes dan pelan penjagaan anda dalam bahasa yang mudah. Apakah yang ingin anda fahami?",
+  "Hello Noor — I can help explain your diabetes results and care plan in clear, everyday language. What would you like to understand?":
+    "Hai Noor — saya boleh membantu menerangkan keputusan diabetes dan pelan penjagaan anda dalam bahasa yang mudah. Apakah yang ingin anda fahami?",
   "AUTOMATIC COMPLICATION ESTIMATES": "ANGGARAN KOMPLIKASI AUTOMATIK",
   "Two Random Forest models calculate possible diabetes-related complication risks from your latest record.":
     "Dua model Random Forest menganggarkan risiko komplikasi berkaitan diabetes berdasarkan rekod terkini anda.",
@@ -205,6 +208,7 @@ const ms: Record<string, string> = {
   "Manage your personal details and how CareLink works for you.":
     "Urus butiran peribadi dan tetapan CareLink anda.",
   "Patient ID": "ID pesakit",
+  Age: "Umur",
   "Type 2 diabetes": "Diabetes jenis 2",
   "Date of birth": "Tarikh lahir",
   Contact: "Nombor telefon",
@@ -399,6 +403,7 @@ const zh: Record<string, string> = {
   "Built around your care": "以您的护理为中心",
   "For educational support only. Always follow advice from your care team.": "仅供教育参考。请始终遵循护理团队的建议。",
   "Good morning, Sarah": "早安，Sarah",
+  "Good morning, Noor": "早安，Noor",
   "Here’s a clear look at how you’re doing today.": "这里清楚显示您今天的健康状况。",
   "Ask your health assistant": "询问您的健康助手",
   "YOUR HEALTH AT A GLANCE": "健康概览",
@@ -545,6 +550,7 @@ const zh: Record<string, string> = {
   "Profile and Settings": "个人资料与设置",
   "Manage your personal details and how CareLink works for you.": "管理您的个人资料以及 CareLink 的使用方式。",
   "Patient ID": "患者 ID",
+  Age: "年龄",
   "Type 2 diabetes": "2 型糖尿病",
   "Date of birth": "出生日期",
   Contact: "联系电话",
@@ -788,6 +794,7 @@ const ta: Record<string, string> = {
   "Profile and Settings": "சுயவிவரம் மற்றும் அமைப்புகள்",
   "Manage your personal details and how CareLink works for you.": "உங்கள் தனிப்பட்ட விவரங்களையும் CareLink உங்களுக்காக எப்படி செயல்படுகிறது என்பதையும் நிர்வகிக்கவும்.",
   "Patient ID": "நோயாளர் ID",
+  Age: "வயது",
   "Type 2 diabetes": "வகை 2 நீரிழிவு",
   "Date of birth": "பிறந்த தேதி",
   Contact: "தொடர்பு",

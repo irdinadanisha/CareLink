@@ -54,6 +54,7 @@ import {
   getLanguageLabel,
   isLanguage,
   languageOptions,
+  translate,
   type Language,
 } from "@/src/i18n/malay";
 import {
@@ -817,8 +818,12 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
         </div>
         <div className="suggestions" aria-label="Suggested questions">
           {starters.map((s) => (
-            <button key={s} onClick={() => send(s)} disabled={typing}>
-              {s}
+            <button
+              key={s}
+              onClick={() => send(translate(s, language))}
+              disabled={typing}
+            >
+              {translate(s, language)}
             </button>
           ))}
         </div>

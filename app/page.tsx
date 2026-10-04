@@ -114,6 +114,40 @@ const normalizeTrendData = (
         },
   );
 
+const getHba1cTrendSummary = (data: { month: string; value: number }[]) => {
+  const points = data.filter((point) => Number.isFinite(point.value));
+  const first = points[0];
+  const latest = points[points.length - 1];
+  if (!first || !latest || points.length < 2) {
+    return {
+      title: "HbA1c trend needs more readings",
+      status: "Not enough data",
+      footnote: "Add another HbA1c reading to see the trend.",
+    };
+  }
+
+  const difference = Math.round((latest.value - first.value) * 10) / 10;
+  if (difference > 0) {
+    return {
+      title: "HbA1c is moving up",
+      status: "Needs attention",
+      footnote: `Your latest reading is ${difference.toFixed(1)}% higher than ${first.month}.`,
+    };
+  }
+  if (difference < 0) {
+    return {
+      title: "HbA1c is moving down",
+      status: "Improving",
+      footnote: `Your latest reading is ${Math.abs(difference).toFixed(1)}% lower than ${first.month}.`,
+    };
+  }
+  return {
+    title: "HbA1c is stable",
+    status: "Stable",
+    footnote: `Your latest reading is about the same as ${first.month}.`,
+  };
+};
+
 const languageLocale: Record<Language, string> = {
   en: "en-MY",
   ms: "ms-MY",
@@ -320,9 +354,9 @@ function Brand({ compact = false }: { compact?: boolean }) {
 
 function StatusBadge({ status }: { status: string }) {
   const label = status || "Unknown";
-  const tone = /good|stable|low|normal/i.test(label)
+  const tone = /good|stable|low|normal|improving|baik|stabil|rendah|normal|改善|稳定|低|正常|மேம்ப|நிலையான|குறைந்த|சாதாரண/i.test(label)
     ? "good"
-    : /high|attention|above/i.test(label)
+    : /high|attention|above|tinggi|perhatian|melebihi|高|关注|超过|அதிக|கவனம்|மேல்/i.test(label)
       ? "warn"
       : "info";
   return (
@@ -679,6 +713,8 @@ function Dashboard({ go, data, language }: { go: (p: Page) => void; data: CareLi
   });
   const firstName = data.profile.fullName.split(" ")[0];
   const conditionText = `Your condition currently ${overallStatus === "Stable" ? "appears stable" : "needs attention"}.`;
+  const hba1cTrendData = normalizeTrendData(data.record.trendData, language);
+  const hba1cTrend = getHba1cTrendSummary(hba1cTrendData);
   return (
     <>
       <section className="welcome">
@@ -763,13 +799,13 @@ function Dashboard({ go, data, language }: { go: (p: Page) => void; data: CareLi
           <div className="card-head">
             <div>
               <p className="eyebrow">6-MONTH TREND</p>
-              <h3>HbA1c is moving down</h3>
+              <h3>{translate(hba1cTrend.title, language)}</h3>
             </div>
-            <StatusBadge status="Improving" />
+            <StatusBadge status={translate(hba1cTrend.status, language)} />
           </div>
-          <TrendChart data={data.record.trendData} />
+          <TrendChart data={hba1cTrendData} />
           <p className="chart-foot">
-            <span /> Your latest reading is 0.4% lower than February.
+            <span /> {translate(hba1cTrend.footnote, language)}
           </p>
         </article>
       </section>

@@ -70,6 +70,7 @@ import {
   signOutPatient,
 } from "@/src/services/patientDataService";
 import type { CareLinkPatientData } from "@/src/types";
+import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
 import { deleteFootCheck, listFootChecks, saveFootCheck, syncPendingFootChecks, type FootCheckRecord } from "@/src/services/footCheckService";
 import {
   deleteCloudChatConversation,
@@ -1608,6 +1609,33 @@ function ResultsPage({ data, language }: { data: CareLinkPatientData; language: 
           </aside>
         )}
       </div>
+      <section className="section-block">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">TEST HISTORY</p>
+            <h2>Blood test panel history</h2>
+          </div>
+        </div>
+        <div className="panel-history">
+          {(data.testPanels ?? []).map((panel) => (
+            <article className="card panel-history-card" key={panel.id}>
+              <div>
+                <p className="eyebrow">{displayDate(panel.date).toUpperCase()}</p>
+                <h3>{panel.doctorName || translate("Clinical update", language)}</h3>
+                {panel.notes && <p>{translate(panel.notes, language)}</p>}
+              </div>
+              <div className="panel-history-tests">
+                {panel.tests.slice(0, 4).map((test) => (
+                  <span key={`${panel.id}-${test.name}`}>
+                    <b>{translate(test.name, language)}</b>
+                    {test.value} {test.unit}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </>
   );
 }
@@ -1952,6 +1980,26 @@ export default function HomePage() {
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+    };
+  }, [accessToken, online, patientId]);
+  useEffect(() => {
+    if (!patientId || !accessToken || !online) return;
+    const supabase = getSupabaseBrowserClient();
+    const refresh = () => {
+      void refreshPatientCache(patientId, accessToken)
+        .then((refreshed) => {
+          setPatientData(refreshed.patient);
+          setSessionSource("online");
+        })
+        .catch(() => undefined);
+    };
+    const channel = supabase
+      .channel(`carelink-clinical-${patientId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "clinical_test_panels", filter: `user_id=eq.${patientId}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "clinical_notes", filter: `user_id=eq.${patientId}` }, refresh)
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
     };
   }, [accessToken, online, patientId]);
   useEffect(() => applyLanguage(language), [language, page, patientData]);

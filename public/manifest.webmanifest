@@ -1,0 +1,18 @@
+{
+  "name": "CareLink",
+  "short_name": "CareLink",
+  "description": "Offline-ready diabetes health companion.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#0a4778",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "24x24",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

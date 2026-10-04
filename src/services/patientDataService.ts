@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "@/src/lib/supabase/client";
 import type { CareLinkPatientData, PatientRecordData, PatientProfile } from "@/src/types";
+import { clearOfflineSession, loadOfflineSession, saveOfflineSession } from "@/src/services/offlineStore";
 
 type PatientRow = {
   record_date: string;
@@ -63,25 +64,67 @@ export async function signInPatient(email: string, password: string) {
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
   if (error || !data.user || !data.session) throw new Error(error?.message || "Sign in failed.");
+  const patient = await loadPatientData(data.user.id);
+  await saveOfflineSession({
+    userId: data.user.id,
+    accessToken: data.session.access_token,
+    patient,
+  });
   return {
     userId: data.user.id,
     accessToken: data.session.access_token,
-    patient: await loadPatientData(data.user.id),
+    patient,
+    source: "online" as const,
   };
 }
 
 export async function restorePatientSession() {
   const supabase = getSupabaseBrowserClient();
   const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session) return null;
+  if (error || !data.session) {
+    const cached = await loadOfflineSession();
+    return cached
+      ? { userId: cached.userId, accessToken: cached.accessToken, patient: cached.patient, source: "offline" as const }
+      : null;
+  }
+  try {
+    const patient = await loadPatientData(data.session.user.id);
+    await saveOfflineSession({
+      userId: data.session.user.id,
+      accessToken: data.session.access_token,
+      patient,
+    });
+    return {
+      userId: data.session.user.id,
+      accessToken: data.session.access_token,
+      patient,
+      source: "online" as const,
+    };
+  } catch (cause) {
+    const cached = await loadOfflineSession();
+    if (cached) {
+      return { userId: cached.userId, accessToken: cached.accessToken, patient: cached.patient, source: "offline" as const };
+    }
+    throw cause;
+  }
+}
+
+export async function refreshPatientCache(userId: string, accessToken: string) {
+  const patient = await loadPatientData(userId);
+  await saveOfflineSession({ userId, accessToken, patient });
   return {
-    userId: data.session.user.id,
-    accessToken: data.session.access_token,
-    patient: await loadPatientData(data.session.user.id),
+    userId,
+    accessToken,
+    patient,
+    source: "online" as const,
   };
 }
 
 export async function signOutPatient() {
-  const { error } = await getSupabaseBrowserClient().auth.signOut();
-  if (error) throw new Error(error.message);
+  try {
+    const { error } = await getSupabaseBrowserClient().auth.signOut();
+    if (error && typeof navigator !== "undefined" && navigator.onLine) throw new Error(error.message);
+  } finally {
+    await clearOfflineSession();
+  }
 }

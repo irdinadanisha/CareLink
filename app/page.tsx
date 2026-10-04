@@ -7,6 +7,8 @@ import {
   Bot,
   Camera,
   CalendarDays,
+  Cloud,
+  CloudOff,
   ClipboardList,
   Download,
   Droplets,
@@ -61,12 +63,13 @@ import {
   type Language,
 } from "@/src/i18n/malay";
 import {
+  refreshPatientCache,
   restorePatientSession,
   signInPatient,
   signOutPatient,
 } from "@/src/services/patientDataService";
 import type { CareLinkPatientData } from "@/src/types";
-import { listFootChecks, saveFootCheck, type FootCheckRecord } from "@/src/services/footCheckService";
+import { listFootChecks, saveFootCheck, syncPendingFootChecks, type FootCheckRecord } from "@/src/services/footCheckService";
 
 const initials = (name: string) =>
   name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
@@ -332,12 +335,16 @@ function Header({
   language,
   onLanguageChange,
   patientName,
+  online,
+  pendingSync,
 }: {
   title: string;
   onMenu: () => void;
   language: Language;
   onLanguageChange: (language: Language) => void;
   patientName: string;
+  online: boolean;
+  pendingSync: boolean;
 }) {
   return (
     <header className="topbar">
@@ -353,6 +360,10 @@ function Header({
         <h1>{title}</h1>
       </div>
       <div className="top-actions">
+        <span className={`connection-pill ${online ? "online" : "offline"} ${pendingSync ? "pending" : ""}`}>
+          {online ? <Cloud size={16} /> : <CloudOff size={16} />}
+          {translate(pendingSync ? "Sync pending" : online ? "Online" : "Offline ready", language)}
+        </span>
         <label className="language-button" aria-label="Preferred language">
           <Languages size={18} />
           <select
@@ -974,7 +985,19 @@ function AssistantPage({ language, data, accessToken }: { language: Language; da
     setText("");
     setTyping(true);
     try {
-      const reply = await sendMessageToLlama(value, { conversation, language, accessToken });
+      const reply = await sendMessageToLlama(value, {
+        conversation,
+        language,
+        accessToken,
+        patientName: data.profile.fullName,
+        hba1c: data.record.bloodTests.find((test) => test.name === "HbA1c")?.value,
+        glucose: data.record.bloodTests.find((test) => test.name === "Fasting blood glucose")?.value,
+        kidneyFunction: String(data.record.kidneyFunction),
+        medication: data.record.medication,
+        nextAppointment: data.record.appointments[0]
+          ? `${data.record.appointments[0].date} ${data.record.appointments[0].time}`
+          : undefined,
+      });
       setMessages((m) => [
         ...m,
         {
@@ -1479,8 +1502,8 @@ function FootHealthPage({ userId, language }: { userId: string; language: Langua
   const preview = useMemo(() => image ? URL.createObjectURL(image) : "", [image]);
 
   useEffect(() => {
-    listFootChecks().then(setHistory).catch(() => {});
-  }, []);
+    listFootChecks(userId).then(setHistory).catch(() => {});
+  }, [userId]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   useEffect(() => {
     if (!cameraOpen) return;
@@ -1550,7 +1573,7 @@ function FootHealthPage({ userId, language }: { userId: string; language: Langua
     try {
       const saved = await saveFootCheck(userId, answers as Record<keyof FootAnswers, boolean>, image);
       setResult(saved);
-      setHistory(await listFootChecks());
+      setHistory(await listFootChecks(userId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The wound check could not be saved.");
     } finally { setSubmitting(false); }
@@ -1593,7 +1616,7 @@ function FootHealthPage({ userId, language }: { userId: string; language: Langua
         <p className="eyebrow">{translate("YOUR RECORDS", language)}</p><h3>{translate("Previous checks", language)}</h3>
         {history.length === 0 ? <p>{translate("No wound health checks saved yet.", language)}</p> : history.map((check) => <article key={check.id}>
           {check.imageUrl && <img src={check.imageUrl} alt={translate("Previously uploaded wound check", language)} />}
-          <div><strong>{translate(`${check.symptomCount}/3 signs reported`, language)}</strong><small>{displayDateTime(check.createdAt, language)}</small><span className={check.recommendation === "doctor_attention" ? "attention" : "monitor"}>{translate(check.recommendation === "doctor_attention" ? "Doctor’s attention advised" : "Continue monitoring", language)}</span></div>
+          <div><strong>{translate(`${check.symptomCount}/3 signs reported`, language)}</strong><small>{displayDateTime(check.createdAt, language)}</small><span className={check.recommendation === "doctor_attention" ? "attention" : "monitor"}>{translate(check.syncStatus === "pending" ? "Saved locally · waiting to sync" : check.recommendation === "doctor_attention" ? "Doctor’s attention advised" : "Continue monitoring", language)}</span></div>
         </article>)}
       </aside>
     </div>
@@ -1732,6 +1755,9 @@ function SettingsPage({ largeText, darkMode, onLargeText, onDarkMode, logout }: 
 export default function HomePage() {
   const [patientData, setPatientData] = useState<CareLinkPatientData | null>(null),
     [accessToken, setAccessToken] = useState(""),
+    [sessionSource, setSessionSource] = useState<"online" | "offline">("online"),
+    [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine),
+    [pendingSync, setPendingSync] = useState(false),
     [authLoading, setAuthLoading] = useState(true),
     [page, setPage] = useState<Page>("dashboard"),
     [menu, setMenu] = useState(false),
@@ -1744,16 +1770,56 @@ export default function HomePage() {
           : null;
       return isLanguage(saved) ? saved : "en";
     });
+  const patientId = patientData?.profile.id;
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    }
+  }, []);
   useEffect(() => {
     let active = true;
-    restorePatientSession().then((session) => {
-      if (active && session) {
-        setPatientData(session.patient);
-        setAccessToken(session.accessToken);
-      }
-    }).finally(() => { if (active) setAuthLoading(false); });
+    restorePatientSession()
+      .then((session) => {
+        if (active && session) {
+          setPatientData(session.patient);
+          setAccessToken(session.accessToken);
+          setSessionSource(session.source);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => { if (active) setAuthLoading(false); });
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  useEffect(() => {
+    if (!patientId || !online) return;
+    let cancelled = false;
+    const sync = async () => {
+      const result = await syncPendingFootChecks(patientId).catch(() => ({ pending: true, synced: 0 }));
+      if (!cancelled) setPendingSync(Boolean(result.pending));
+      if (accessToken) {
+        const refreshed = await refreshPatientCache(patientId, accessToken).catch(() => null);
+        if (!cancelled && refreshed) {
+          setPatientData(refreshed.patient);
+          setSessionSource("online");
+        }
+      }
+    };
+    void sync();
+    const interval = window.setInterval(sync, 45_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [accessToken, online, patientId]);
   useEffect(() => applyLanguage(language), [language, page, patientData]);
   useEffect(() => {
     document.documentElement.classList.toggle("large-text-mode", largeText);
@@ -1802,8 +1868,9 @@ export default function HomePage() {
     const session = await signInPatient(email, password);
     setPatientData(session.patient);
     setAccessToken(session.accessToken);
+    setSessionSource(session.source);
   };
-  const logout = async () => { await signOutPatient(); setPatientData(null); setAccessToken(""); setPage("dashboard"); };
+  const logout = async () => { await signOutPatient(); setPatientData(null); setAccessToken(""); setSessionSource("online"); setPage("dashboard"); };
   const toggleLargeText = () => setLargeText((current) => {
     const next = !current; window.localStorage.setItem("carelink-large-text", String(next)); return next;
   });
@@ -1872,6 +1939,8 @@ export default function HomePage() {
           language={language}
           onLanguageChange={changeLanguage}
           patientName={patientData.profile.fullName}
+          online={online && sessionSource === "online"}
+          pendingSync={pendingSync}
         />
         <div className="content">
           {page === "dashboard" && <Dashboard go={go} data={patientData} language={language} />}{" "}
